@@ -71,6 +71,15 @@
   .qscore div{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; text-align:center; padding:6px 2px; font-size:13px}
   .qscore div b{display:block; font-size:16px}
   .qscore div.on{border-color:var(--good)}
+  .fouls{display:flex; gap:8px; font-size:13px; line-height:1.35}
+  .fouls > div{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px 10px; min-width:0}
+  .fouls b.t{font-size:11px; letter-spacing:.5px; text-transform:uppercase; margin-right:6px}
+  .fouls .us b.t{color:var(--usSel)} .fouls .opp b.t{color:var(--oppSel)}
+  .fouls span.c{display:inline-block; margin-right:8px; white-space:nowrap; font-weight:700}
+  .fouls span.c.out{color:#fff; background:var(--bad); border-radius:6px; padding:0 5px}
+  .fouls span.c.e2{color:var(--warn)}
+  .fouls span.p{opacity:.8; font-weight:600}
+  .fouls .none{color:var(--mute); font-weight:400}
   .toast{position:fixed; left:50%; bottom:14px; transform:translateX(-50%); background:#000c; color:#fff; padding:10px 16px; border-radius:12px; font-weight:700; opacity:0; transition:opacity .2s; pointer-events:none; z-index:9}
   .toast.show{opacity:1}
 
@@ -101,6 +110,7 @@
     .mid{display:contents}
     .qbar{order:1} .qbar button{padding:9px 0; font-size:15px} .qbar .undo{padding:9px 12px}
     .qscore{order:2} .qscore div{padding:4px 2px; font-size:11px} .qscore div b{font-size:14px}
+    .fouls{order:3; flex-direction:column; gap:4px; font-size:12px} .fouls > div{padding:4px 8px}
     .teamtoggle{display:flex; order:3}
     .capcol{order:4; width:100%; flex:none; max-height:36vh; overflow:auto}
     .capcol .hdr{display:none}
@@ -117,7 +127,7 @@
   @media (max-height:460px) and (min-width:701px){
     .tabs{padding-top:4px; padding-bottom:4px} .tabs button{padding:6px 10px}
     .capcol{width:150px} .cap{height:44px; font-size:17px} .cap small{display:none}
-    .qbar button{padding:7px 0; font-size:15px} .qscore{display:none}
+    .qbar button{padding:7px 0; font-size:15px} .qscore{display:none} .fouls{font-size:12px} .fouls > div{padding:3px 8px}
     .act{height:48px; font-size:14px} .act small{display:none} .sel{min-height:36px; padding:6px 10px}
   }
 </style>
@@ -194,6 +204,7 @@
       <button class="undo" onclick="undo()">↶ Undo</button>
     </div>
     <div class="qscore" id="qscore"></div>
+    <div class="fouls" id="fouls"></div>
     <div class="sel" id="selBox"><span class="small">Tap a cap number, then an action.</span></div>
     <div class="actions" id="actions"></div>
   </div>
@@ -421,7 +432,16 @@ function renderGame(){
       const n=ex[p.cap]||0; b.innerHTML=`${p.cap}${p.name?`<small>${p.name}</small>`:''}${n?`<span class="exl${n>=3?' out':''}">${n>=3?'OUT':'E'+n}</span>`:''}`;
       b.addEventListener('click',()=>selectCap(team,p.cap)); box.appendChild(b); }); };
   mk('us',G.rosterUs,exUs); mk('opp',G.rosterOpp,exOpp);
-  renderActions(); renderQScore(); renderScore();
+  renderActions(); renderQScore(); renderFouls(); renderScore();
+}
+// Running fouls strip: every cap with an exclusion or penalty, both teams, OUT flagged. What you check the table against.
+function renderFouls(){
+  const side=(team,name)=>{ const ex=exclusionsByCap(G.events,team); const pen={}; for(const e of G.events) if(e.team===team&&e.action==='pen') pen[e.cap]=(pen[e.cap]||0)+1;
+    const caps=[...new Set([...Object.keys(ex),...Object.keys(pen)])].sort(capSort);
+    const tot=Object.values(ex).reduce((a,b)=>a+b,0);
+    const items=caps.map(c=>{ const n=ex[c]||0, p=pen[c]||0; const cls=n>=3?'out':(n===2?'e2':''); return `<span class="c ${cls}">#${c}${n?' '+(n>=3?'OUT':'E'+n):''}${p?` <span class="p">P${p>1?p:''}</span>`:''}</span>`; }).join('');
+    return `<div class="${team}"><b class="t">${name} · ${tot} EXL</b>${items||'<span class="none">none</span>'}</div>`; };
+  el('fouls').innerHTML=side('us',G.us||'US')+side('opp',G.opp||'OPP');
 }
 function selectCap(team,cap){ selected=(selected&&selected.team===team&&selected.cap===cap)?null:{team,cap}; renderGame(); }
 window.clearSel=()=>{ selected=null; renderGame(); };
