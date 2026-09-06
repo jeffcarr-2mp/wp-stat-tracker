@@ -7,12 +7,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="WP Stats">
-<meta name="theme-color" content="#0b1a2e">
+<meta name="theme-color" content="#0A1226">
 <style>
   :root{
-    --bg:#0b1a2e; --panel:#122642; --panel2:#183157; --line:#274a7a;
-    --txt:#eaf1fb; --mute:#9db2cf; --us:#2f80ed; --usSel:#59a8ff; --opp:#e0504b; --oppSel:#ff7a75;
-    --good:#2ecc71; --warn:#f5b342; --bad:#ff5c5c; --btn:#1f3a63; --btnTxt:#eaf1fb;
+    --bg:#0A1226; --panel:#101C3A; --panel2:#15244A; --line:#2A3C66;
+    --txt:#E9EEF8; --mute:#8E9DBB; --us:#003087; --usSel:#7FA1E8; --opp:#3A4045; --oppSel:#B8BCBC;
+    --good:#B3C1DB; --warn:#E0B85A; --bad:#D9534F; --btn:#1B2E5C; --btnTxt:#E9EEF8;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation; user-select:none; -webkit-user-select:none;}
   html,body{margin:0; height:100%; background:var(--bg); color:var(--txt); font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Helvetica,Arial,sans-serif; overscroll-behavior:none;}
@@ -24,7 +24,8 @@
   button:disabled{opacity:.35; pointer-events:none}
   .tabs{display:flex; gap:6px; padding:8px 10px calc(0px + env(safe-area-inset-top)); padding-top:calc(8px + env(safe-area-inset-top)); background:var(--panel); border-bottom:1px solid var(--line); align-items:center}
   .tabs button{background:transparent; color:var(--mute); padding:10px 14px; font-weight:600}
-  .tabs button.on{background:var(--panel2); color:var(--txt)}
+  .tabs button.on{background:var(--panel2); color:var(--txt); box-shadow:inset 0 -2px 0 var(--usSel)}
+  .tabs .brandmark{height:28px; width:28px; border-radius:5px; background:#fff; margin-right:2px}
   .tabs .score{margin-left:auto; font-weight:800; font-size:20px; letter-spacing:.5px; display:flex; gap:10px; align-items:center}
   .tabs .score .us{color:var(--usSel)} .tabs .score .opp{color:var(--oppSel)}
   .view{display:none; flex:1; overflow:auto; padding:12px}
@@ -37,10 +38,10 @@
   .roster .p{display:flex; gap:6px; align-items:center}
   .roster .p input.cap{width:64px; text-align:center; font-weight:700}
   .roster .p input.nm{flex:1}
-  .roster .p button{padding:8px 10px; background:#3a2030}
+  .roster .p button{padding:8px 10px; background:#4A2E2E}
   .small{font-size:12px; color:var(--mute)}
-  .primary{background:var(--us); font-weight:700; font-size:17px; padding:14px 22px}
-  .danger{background:#7a2b2b}
+  .primary{background:#2A5DB8; font-weight:700; font-size:17px; padding:14px 22px}
+  .danger{background:#7A2B2B}
 
   /* GAME */
   #game{padding:8px; gap:8px; flex-direction:row}
@@ -51,14 +52,14 @@
   .capgrid{display:grid; grid-template-columns:1fr 1fr; gap:6px}
   .cap{height:58px; border-radius:12px; font-weight:800; font-size:22px; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; padding:4px; position:relative}
   .cap small{font-size:10px; font-weight:600; opacity:.85; margin-top:3px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .cap.us{background:#1c3f6e} .cap.us.sel{background:var(--usSel); color:#04101f; box-shadow:0 0 0 3px #fff inset}
-  .cap.opp{background:#5a2422} .cap.opp.sel{background:var(--oppSel); color:#1f0505; box-shadow:0 0 0 3px #fff inset}
-  .cap .exl{position:absolute; top:3px; right:5px; font-size:10px; font-weight:800; color:var(--warn)}
+  .cap.us{background:var(--us)} .cap.us.sel{background:var(--usSel); color:#0A1226; box-shadow:0 0 0 3px #fff inset}
+  .cap.opp{background:var(--opp)} .cap.opp.sel{background:var(--oppSel); color:#0A1226; box-shadow:0 0 0 3px #fff inset}
+  .cap .exl{position:absolute; top:3px; right:5px; font-size:10px; font-weight:800; color:#F2D27A}
   .cap .exl.out{color:#fff; background:var(--bad); border-radius:6px; padding:1px 4px}
   .mid{flex:1; display:flex; flex-direction:column; gap:8px; min-width:0}
   .qbar{display:flex; gap:6px; align-items:center}
   .qbar button{flex:1; padding:12px 0; font-weight:800; font-size:18px; background:var(--panel2)}
-  .qbar button.on{background:var(--good); color:#04250f}
+  .qbar button.on{background:var(--good); color:#0A1226}
   .qbar .undo{flex:none; background:#5a4a1c; padding:12px 16px}
   .sel{background:var(--panel); border:1px dashed var(--line); border-radius:12px; padding:10px 12px; font-size:18px; font-weight:700; min-height:48px; display:flex; align-items:center; gap:10px}
   .sel .who{font-size:24px}
@@ -66,11 +67,11 @@
   .actions{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; flex:1; align-content:start}
   .act{height:72px; border-radius:14px; font-weight:800; font-size:19px; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.05}
   .act small{font-size:11px; font-weight:600; opacity:.8; margin-top:4px}
-  .act.g{background:#1f7a46} .act.m{background:#3b4f6b} .act.a{background:#2c5f9e} .act.d{background:#4a3d8a} .act.x{background:#8a3d3d} .act.s{background:#6b5a1e}
+  .act.g{background:#003087} .act.m{background:#3A4A6B} .act.a{background:#4F6391} .act.d{background:#2A5DB8} .act.x{background:#6E7373} .act.s{background:#5A6E96}
   .qscore{display:flex; gap:6px}
   .qscore div{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; text-align:center; padding:6px 2px; font-size:13px}
   .qscore div b{display:block; font-size:16px}
-  .qscore div.on{border-color:var(--good)}
+  .qscore div.on{border-color:var(--usSel)}
   .fouls{display:flex; gap:8px; font-size:13px; line-height:1.35}
   .fouls > div{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px 10px; min-width:0}
   .fouls b.t{font-size:11px; letter-spacing:.5px; text-transform:uppercase; margin-right:6px}
@@ -92,7 +93,7 @@
   tr.tot td{font-weight:800; border-top:2px solid var(--line)}
   .flag{color:var(--bad); font-weight:800}
   .filt{display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap}
-  .filt button{background:var(--panel2); padding:8px 14px} .filt button.on{background:var(--good); color:#04250f}
+  .filt button{background:var(--panel2); padding:8px 14px} .filt button.on{background:var(--good); color:#0A1226}
   .logrow{display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--line); font-size:15px}
   .logrow .q{width:36px; font-weight:800; color:var(--mute)}
   .logrow .t{width:70px; font-weight:800} .logrow .t.us{color:var(--usSel)} .logrow .t.opp{color:var(--oppSel)}
@@ -101,11 +102,11 @@
   textarea.md{width:100%; height:260px; font-family:ui-monospace,Menlo,monospace; font-size:12px; white-space:pre; user-select:text}
   .teamtoggle{display:none; gap:6px}
   .teamtoggle button{flex:1; padding:10px 0; font-weight:800; font-size:15px; background:var(--panel2); color:var(--mute)}
-  .teamtoggle button.us.on{background:var(--us); color:#fff} .teamtoggle button.opp.on{background:var(--opp); color:#fff}
+  .teamtoggle button.us.on{background:var(--us); color:#fff} .teamtoggle button.opp.on{background:#6E7373; color:#fff}
   @media (max-width:820px) and (min-width:701px){ .capcol{width:132px} .cap{height:52px; font-size:18px} .act{height:62px; font-size:16px} }
   /* PHONE (portrait): stack everything, one cap grid at a time */
   @media (max-width:700px){
-    .tabs{padding-left:6px; padding-right:6px; gap:2px} .tabs button{padding:9px 9px; font-size:14px} .tabs .score{font-size:17px}
+    .tabs{padding-left:6px; padding-right:6px; gap:2px} .tabs button{padding:9px 8px; font-size:14px} .tabs .score{font-size:17px} .tabs .brandmark{height:24px; width:24px}
     #game.on{flex-direction:column; padding:6px; gap:6px; overflow:auto}
     .mid{display:contents}
     .qbar{order:1} .qbar button{padding:9px 0; font-size:15px} .qbar .undo{padding:9px 12px}
@@ -135,6 +136,7 @@
 <body>
 
 <div class="tabs">
+  <img class="brandmark" alt="St. Xavier" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAACWCAMAAAAL34HQAAAAP1BMVEUAMIeXm5uAmMNEZ6fExsbz9fenqqr///+JjY3h4uIWQI3m6O2/y+HQ0tIpUZulttWztrZnhLjP2Om9v7+PpMtS6N5qAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAxmVYSWZJSSoACAAAAAcAEgEDAAEAAAABAAAAGgEFAAEAAABiAAAAGwEFAAEAAABqAAAAKAEDAAEAAAACAAAAMQECAAYAAAByAAAAEwIDAAEAAAABAAAAaYcEAAEAAAB4AAAAAAAAAEgAAAABAAAASAAAAAEAAABiZkB2MQAGAACQBwAEAAAAMDIxMAGRBwAEAAAAAQIDAACgBwAEAAAAMDEwMAGgAwABAAAA//8AAAKgBAABAAAAlgAAAAOgBAABAAAAlgAAAAAAAADehTnJAAAIdElEQVR4nO1b2xKrKgwFIQZExdv/f+uZgCheWtG2e3Nm9nqpthAWIQkQKMMswTBLMMwSDLMEwyzBMEswzBIMswTDLMEwSzDMEgyzBMMswTBLMMwSDLMEwyzBMEsw/L/RKh8AEXG8Vfo2LdXJm+iU786d0vdpabwJ7WnJO6Uf0KrZLdQLrRul/9HCf9rKx7YGIURKC4y1QggxLLToTQhRvSy6ln5Ay32Y4lR6DGFeBIh6X1XYVf5TWpwicdeAadlbtKh91Oaelqvn6sKwLTmhWecA/oyWj8WlUgbe87JGhcBO9ZoQxkfFcWMEE46KR3PHI1ozgCuz6/QOdaPmUdxhVNhH5XrsVHPZXiItBM6x2FOJUQDvzioaNWKk5xabVFZJC5ud+AMqo8/aA1XitJZqQSv51fVWo7R5544CRwUHVpyDjbgPRp3q9DktLDlE/T6iQM73dTplhqgvNdH8Mi1Q3dan9hjMfoBGpSFiZZEfFfopLdTbRg5oYeeNjWrisEJOeO6tH9HCTsWGckRPA731kig2iBtOeIsW8HITgw6oQY0Rqy6OKaTL5jc7H70dlQMq0Msq+yMnvEcL5UWwFzTQvmipYOuE6uCnX6OFV8HehmDfKROHOXsrNNymZRKD/YdOeJcWpgV7mmKiGCdQ3t/Z3dvslwnBnqy7/8QJ79OChGCvtk5objvhfVqYEuw3K9KBlhE/p4XXwR4+dcIntOA62EdOWDxxwie08DLYR7bX0zLiD6Xd5NXK/lMn3NHS6q9Dn9AC+dcBzwfxz+CEFky9EMX0zrHtVBMGxIE+p/r3tGzFRNGTd7+GCAEAXYKitT+nNdDsSh89ol20YOxWeS5ItPRkWRtCEzh2UEehanl0koIMCA/GaTyFVk+7FPoUiPE8U2+LuTmopk+xdKhl1Nw8CwxOpZVd36O9bI+RcDEk0BK+kus6a23dMtbWtt3Tcq21iKJd1FjNHXIJHures55+HIJikealtq6t6woQbWMrWm8n0fLSEWsSLtygmgMtV7CYKrPj6ep5ywyU27mnQRhaEYr5anXSIDImvDwbSYJ9Qb+UWCWKoCTHo6WuzN0Ti/94Yb0ZVlomjZZfAFSLb820TjAt6nH1GO0qvFZIAxaLCk9p2ZmGowV9LOQ1rWCi/SUtJPUs9PvWKXoZNoFtcUZrVXE4jJiH5oIWedQclN7TAioXzBWqwnXI16IdUs/MGa22jrVFVc7En00+pNil4yutqdh6ct+KVathq9audhf0fbAtYXAIg0hNTWm05oFczNfT6ndGMFVDCF7Eo7V13S+jSk9LJ9qFVhBWOC9ytkUihkta08Jhbm/RgHCOs6CmTjqrJ60WrmFX2CnZRGND3/qXIGxy7546kauGK1qF7y4p2DXn/XI6aGvw0Z3Mq0dDlAXadnXidnGGyYmgGSpauNo5ElWT/+wvaNWeejGXtIWt67og44XJfczFKm8Rzpt6U9A6gmY4Wk64rtulIS+iBnpyBeq6sMsqxCDWhRDTBS2oWNXb/sg/hlMLqdCpibHWTTLfxDGcTnQg059P7DNsQbB08DLj57TyAFueQP91wP9o56PvYFSjFlUKes3VB9q6BbNNF7F7OftrPKMF+5ztVRpH/xFafJMuqoZlkZKSs/8ZrW57nGNhczZwRE35up/TarZZG0oXpefsf0ZLqwZ36SJSX2LO/le0zFnONiFnX/6UFigelvthfEafsxf3D2i/Rgs4h/rkOCclZ29+R6vbO2HI2ZabSJZ2QPs1WlLp2OcmOnV6fED7NVqNavDVcU5Kzl7/hJbZOeH2TLVTsdV9Fuzv0IL3Fxsuc/Y2PdjfoAVXZ6p3Dmi/R6t75YRPDmi/RmvcOuHpxYarYD+lBvtkWk3KmerXgj175oTixcWGq2DfJgb7RFqwv9jw6nbRl4J94h2b5IsN8J1gn3gjaXuxwdJNsxf4TrBPotUpEzdVvfXzbnvz7oAey2vzuqZlGr4Lk+27WQQ69T5IkK6V1A9pletmtzQutb/CbHbgwVTCl+8vcZBlwhgk36fF170uHWXEaCHagke03Lu53NdSCsoV5Q9olRiyRMfOt+GnwmJEC2v6KuG+cdVTQWrjAa1r8YyJDa33RrXHP1p38E9bf0BbRQLs0ROT8ZBWGlRE6yae0ErOeMqF1m3cp2WS06jwPFVt/rd5+azAMEswzBIMswTDLMEwSzDMEgyzBMMswZYn8FcGQUq9/A3MvyHq5f9eEK4X0mQjpaTpgz6lbOK/YjT+ff6/WIeNbEIT/quxmRtx1YCe45loc8xJVSWdNs4bphKBrk7Tb2FvDzz8ZOYHuoruseRKuvAepmQc3R81QCnAWYAMjSgdhHJzTosD1VQapVsWgEYSzP0d+Bml26qDAaU6QM1Vh5pWAqBVWNhIYkR7QWhIAGIzC3QvXoCeGzFSlShJlOmiBEJMiyuJUnFHq9N6JPKKc8Xj/EypGq0bShm5VQko5WlRt+Yi8+lu5yr5b51A7Yo4AfSLowVSddSPTurlxuCOluTKKE5/BpCzdhFVCVx1G1qEWajX3n4QZ36ebaA1YxZQRt8ZBC90fEGrIS6eVqe1M0ayL+70eNCWMzcyF624dAM3gyzIZTXHl9qiHktVypFYIWrQsjs/QieNcDfQwbboeib1i4x7Z1uOjwSiXHq1NM43HDrFNX3h1T3T2tkWgv9u9HW1c6ZzWqP7nS6TB/2SbbkM5apgHiqTavnsEDQm5cZbybeaVXUbWg5yti2umuC5pyYPFIsa+svrEre6EMyaOG7p8Nh0pQtHPqo10VVpLcvOvy0CTuNWqAbN6EUdaWUFhlmCYZZgmCUYZgmGWYJhlmCYJRhmCYZZgmGWYJglGGYJhlmCYZZgmCUYZgmGWYL9bQLn+A8GER6502Rh9QAAAABJRU5ErkJggg==">
   <button data-v="setup" class="on">Setup</button>
   <button data-v="game">Game</button>
   <button data-v="stats">Stats</button>
