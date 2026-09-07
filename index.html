@@ -19,6 +19,7 @@
   body{display:flex; flex-direction:column; height:100dvh;}
   input,select,textarea{user-select:text; -webkit-user-select:text; font:inherit; color:var(--txt); background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px;}
   input[type=date]{min-width:150px}
+  input[type=color]{padding:0; width:36px; height:32px; border-radius:8px}
   button{font:inherit; border:0; border-radius:10px; background:var(--btn); color:var(--btnTxt); padding:10px 14px; cursor:pointer;}
   button:active{filter:brightness(1.25)}
   button:disabled{opacity:.35; pointer-events:none}
@@ -42,6 +43,7 @@
   .small{font-size:12px; color:var(--mute)}
   .primary{background:#2A5DB8; font-weight:700; font-size:17px; padding:14px 22px}
   .danger{background:#7A2B2B}
+  .ghost{background:transparent; color:var(--mute); border:1px solid var(--line)}
 
   /* GAME */
   #game{padding:8px; gap:8px; flex-direction:row}
@@ -56,18 +58,20 @@
   .cap.opp{background:var(--opp)} .cap.opp.sel{background:var(--oppSel); color:#0A1226; box-shadow:0 0 0 3px #fff inset}
   .cap .exl{position:absolute; top:3px; right:5px; font-size:10px; font-weight:800; color:#F2D27A}
   .cap .exl.out{color:#fff; background:var(--bad); border-radius:6px; padding:1px 4px}
+  .cap .gl{position:absolute; top:3px; left:5px; font-size:10px; font-weight:800; color:#fff; background:#0008; border-radius:6px; padding:1px 4px}
   .mid{flex:1; display:flex; flex-direction:column; gap:8px; min-width:0}
   .qbar{display:flex; gap:6px; align-items:center}
-  .qbar button{flex:1; padding:12px 0; font-weight:800; font-size:18px; background:var(--panel2)}
+  .qbar button{flex:1; padding:12px 0; font-weight:800; font-size:18px; background:var(--panel2); position:relative}
   .qbar button.on{background:var(--good); color:#0A1226}
+  .qbar button.lock::after{content:'🔒'; position:absolute; top:2px; right:4px; font-size:10px}
   .qbar .undo{flex:none; background:#5a4a1c; padding:12px 16px}
   .sel{background:var(--panel); border:1px dashed var(--line); border-radius:12px; padding:10px 12px; font-size:18px; font-weight:700; min-height:48px; display:flex; align-items:center; gap:10px}
   .sel .who{font-size:24px}
   .sel .clear{margin-left:auto; background:transparent; color:var(--mute); font-size:14px; padding:6px 10px}
   .actions{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; flex:1; align-content:start}
-  .act{height:72px; border-radius:14px; font-weight:800; font-size:19px; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.05}
+  .act{height:72px; border-radius:14px; font-weight:800; font-size:19px; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.05; color:#fff}
   .act small{font-size:11px; font-weight:600; opacity:.8; margin-top:4px}
-  .act.g{background:#003087} .act.m{background:#3A4A6B} .act.a{background:#4F6391} .act.d{background:#2A5DB8} .act.x{background:#6E7373} .act.s{background:#5A6E96}
+  .act.w2{grid-column:span 2}
   .qscore{display:flex; gap:6px}
   .qscore div{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; text-align:center; padding:6px 2px; font-size:13px}
   .qscore div b{display:block; font-size:16px}
@@ -81,8 +85,59 @@
   .fouls span.c.e2{color:var(--warn)}
   .fouls span.p{opacity:.8; font-weight:600}
   .fouls .none{color:var(--mute); font-weight:400}
-  .toast{position:fixed; left:50%; bottom:14px; transform:translateX(-50%); background:#000c; color:#fff; padding:10px 16px; border-radius:12px; font-weight:700; opacity:0; transition:opacity .2s; pointer-events:none; z-index:9}
+  /* last-3 strip */
+  .last3{display:flex; flex-direction:column; gap:4px}
+  .last3 .ev{display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px 10px; font-size:14px; cursor:pointer}
+  .last3 .ev:first-child{border-color:var(--usSel)}
+  .last3 .ev .q{font-weight:800; color:var(--mute); width:28px}
+  .last3 .ev .t{font-weight:800; width:34px} .last3 .ev .t.us{color:var(--usSel)} .last3 .ev .t.opp{color:var(--oppSel)}
+  .last3 .ev .pr{color:var(--mute); font-size:12px}
+  .last3 .ev .ed{margin-left:auto; color:var(--mute); font-size:12px}
+  .last3 .ev.edited .ed{color:var(--warn)}
+  .last3 .empty{color:var(--mute); font-size:12px; padding:4px 10px}
+  .toast{position:fixed; left:50%; bottom:14px; transform:translateX(-50%); background:#000c; color:#fff; padding:10px 16px; border-radius:12px; font-weight:700; opacity:0; transition:opacity .2s; pointer-events:none; z-index:20}
   .toast.show{opacity:1}
+
+  /* SHEET (modal) */
+  .ov{position:fixed; inset:0; background:#000a; display:none; align-items:flex-end; justify-content:center; z-index:10}
+  .ov.on{display:flex}
+  .sheet{background:var(--panel); border:1px solid var(--line); border-radius:16px 16px 0 0; width:100%; max-width:720px; max-height:92dvh; overflow:auto; padding:14px 14px calc(14px + env(safe-area-inset-bottom))}
+  .sheet h3{margin:0 0 10px; font-size:18px}
+  .sheet h3 .small{font-weight:400; margin-left:8px}
+  .sheet .sec{margin:10px 0 4px; font-size:11px; color:var(--mute); text-transform:uppercase; letter-spacing:1px}
+  .sheet .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:6px}
+  .sheet .grid .cap{height:52px; font-size:20px}
+  .sheet .agrid{display:grid; grid-template-columns:repeat(3,1fr); gap:6px}
+  .sheet .agrid .act{height:54px; font-size:15px}
+  .sheet .act.sel,.sheet .cap.sel{box-shadow:0 0 0 3px #fff inset}
+  .sheet .qg{display:flex; gap:6px} .sheet .qg button{flex:1; background:var(--panel2); font-weight:800} .sheet .qg button.on{background:var(--good); color:#0A1226}
+  .sheet .foot{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap}
+  .sheet .foot .primary{flex:1}
+  .sheet .foot .sp{flex:1}
+  .sheet .lines{display:flex; flex-direction:column; gap:3px; margin-bottom:6px}
+  .sheet .lines .ev{display:flex; gap:8px; align-items:center; padding:6px 8px; background:var(--panel2); border-radius:8px; font-size:14px; cursor:pointer}
+  .sheet .lines .ev.edited{outline:1px solid var(--warn)}
+  .sheet .lines .ev .m{color:var(--mute); font-size:12px}
+  .sheet .lines .ev .ed{margin-left:auto; color:var(--mute); font-size:12px}
+  .sheet .lines .ev.edited .ed{color:var(--warn)}
+  .sheet .sum{display:flex; gap:8px; flex-wrap:wrap; font-size:13px}
+  .sheet .sum > div{flex:1; min-width:160px; background:var(--panel2); border-radius:8px; padding:6px 10px}
+  .sheet .sum b.t{display:block; font-size:11px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:2px}
+  .sheet .sum .us b.t{color:var(--usSel)} .sheet .sum .opp b.t{color:var(--oppSel)}
+  .sheet .chk{font-size:13px; margin-top:6px}
+  .chk div{padding:3px 0} .chk .ok{color:var(--good)} .chk .no{color:var(--warn); font-weight:700}
+
+  /* SETTINGS */
+  .btnlist{display:flex; flex-direction:column; gap:6px}
+  .btnrow{display:flex; gap:6px; align-items:center; flex-wrap:wrap; background:var(--panel2); border-radius:10px; padding:6px 8px}
+  .btnrow .sw{width:14px; height:32px; border-radius:6px; flex:none}
+  .btnrow input.lbl{width:130px}
+  .btnrow .mv button{padding:6px 8px; background:var(--panel)}
+  .btnrow label.ck{display:flex; flex-direction:row; align-items:center; gap:4px; font-size:12px; color:var(--mute)}
+  .btnrow .key{font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--mute); width:56px}
+  .btnrow.off{opacity:.5}
+  .swatches{display:flex; gap:4px; align-items:center}
+  .swatches button{width:24px; height:24px; padding:0; border-radius:6px; border:1px solid #fff3}
 
   /* TABLES */
   table{border-collapse:collapse; width:100%; font-size:14px}
@@ -91,14 +146,17 @@
   td.l,th.l{text-align:left}
   td.mono{font-family:ui-monospace,Menlo,monospace; letter-spacing:1px}
   tr.tot td{font-weight:800; border-top:2px solid var(--line)}
+  td.tap{cursor:pointer; text-decoration:underline dotted var(--mute)}
   .flag{color:var(--bad); font-weight:800}
   .filt{display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap}
   .filt button{background:var(--panel2); padding:8px 14px} .filt button.on{background:var(--good); color:#0A1226}
-  .logrow{display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--line); font-size:15px}
+  .logrow{display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--line); font-size:15px; cursor:pointer}
   .logrow .q{width:36px; font-weight:800; color:var(--mute)}
   .logrow .t{width:70px; font-weight:800} .logrow .t.us{color:var(--usSel)} .logrow .t.opp{color:var(--oppSel)}
-  .logrow .del{margin-left:auto; background:#3a2030; padding:6px 12px}
-  .logrow select{padding:4px 6px}
+  .logrow .pr{color:var(--mute); font-size:12px}
+  .logrow .ed{margin-left:auto; color:var(--mute); font-size:12px}
+  .logrow.edited .ed{color:var(--warn)}
+  .logrow.lock .q::after{content:' 🔒'; font-size:10px}
   textarea.md{width:100%; height:260px; font-family:ui-monospace,Menlo,monospace; font-size:12px; white-space:pre; user-select:text}
   .teamtoggle{display:none; gap:6px}
   .teamtoggle button{flex:1; padding:10px 0; font-weight:800; font-size:15px; background:var(--panel2); color:var(--mute)}
@@ -106,7 +164,7 @@
   @media (max-width:820px) and (min-width:701px){ .capcol{width:132px} .cap{height:52px; font-size:18px} .act{height:62px; font-size:16px} }
   /* PHONE (portrait): stack everything, one cap grid at a time */
   @media (max-width:700px){
-    .tabs{padding-left:6px; padding-right:6px; gap:2px} .tabs button{padding:9px 8px; font-size:14px} .tabs .score{font-size:17px} .tabs .brandmark{height:24px; width:24px}
+    .tabs{padding-left:6px; padding-right:6px; gap:2px} .tabs button{padding:9px 7px; font-size:13px} .tabs .score{font-size:17px} .tabs .brandmark{height:24px; width:24px}
     #game.on{flex-direction:column; padding:6px; gap:6px; overflow:auto}
     .mid{display:contents}
     .qbar{order:1} .qbar button{padding:9px 0; font-size:15px} .qbar .undo{padding:9px 12px}
@@ -120,6 +178,7 @@
     .cap{height:52px; font-size:19px; border-radius:10px} .cap small{font-size:9px}
     .sel{order:5; font-size:15px; min-height:42px; padding:8px 10px} .sel .who{font-size:20px}
     .actions{order:6; flex:none; gap:6px} .act{height:58px; font-size:15px; border-radius:11px} .act small{font-size:10px}
+    .last3{order:7}
     .view{padding:8px} .roster{grid-template-columns:1fr} table{font-size:12px} th,td{padding:5px 5px}
     .card{padding:10px} .row{gap:8px} .row label{flex:1 1 44%; min-width:0} .row label input,.row label select{width:100% !important; min-width:0}
     .row button{flex:1 1 44%} .row .primary{flex:1 1 100%}
@@ -130,6 +189,7 @@
     .capcol{width:150px} .cap{height:44px; font-size:17px} .cap small{display:none}
     .qbar button{padding:7px 0; font-size:15px} .qscore{display:none} .fouls{font-size:12px} .fouls > div{padding:3px 8px}
     .act{height:48px; font-size:14px} .act small{display:none} .sel{min-height:36px; padding:6px 10px}
+    .last3 .ev{padding:3px 8px; font-size:12px}
   }
 </style>
 </head>
@@ -142,6 +202,7 @@
   <button data-v="stats">Stats</button>
   <button data-v="log">Log</button>
   <button data-v="export">Export</button>
+  <button data-v="settings">⚙</button>
   <div class="score"><span class="us" id="scUs">0</span><span class="small">–</span><span class="opp" id="scOpp">0</span></div>
 </div>
 
@@ -152,10 +213,12 @@
     <div class="row">
       <label>Date<input type="date" id="gDate"></label>
       <label>Our team<input id="gUs" placeholder="St. Xavier" style="width:150px"></label>
+      <label>Short name<input id="gUsShort" placeholder="ST X" style="width:90px"></label>
       <label>Opponent<input id="gOpp" placeholder="Hudsonville" style="width:170px"></label>
       <label>Location<input id="gLoc" placeholder="Upper Arlington" style="width:170px"></label>
       <label>Home/Away<select id="gHA"><option>Home</option><option>Away</option><option>Neutral</option></select></label>
       <label>Level<select id="gLvl"><option>Varsity</option><option>JV</option><option>Club</option></select></label>
+      <label>Our caps<select id="gCaps"><option value="dark">Dark</option><option value="white">White</option></select></label>
     </div>
   </div>
 
@@ -164,6 +227,7 @@
     <div class="roster" id="rosterUs"></div>
     <div class="row" style="margin-top:10px">
       <button onclick="addPlayer('us')">+ Add player</button>
+      <button onclick="rosterFromLast()">Roster from last game</button>
       <button onclick="loadDefaultRoster()">Load default caps</button>
       <button onclick="sortRoster('us')">Sort by cap</button>
       <label class="small">Import roster .json<input type="file" accept=".json" onchange="restoreJSON(this)"></label>
@@ -209,6 +273,7 @@
     <div class="fouls" id="fouls"></div>
     <div class="sel" id="selBox"><span class="small">Tap a cap number, then an action.</span></div>
     <div class="actions" id="actions"></div>
+    <div class="last3" id="last3"></div>
   </div>
 
   <div class="col capcol hide" id="colOpp">
@@ -223,14 +288,15 @@
     <button data-q="all" class="on">Game</button><button data-q="1">Q1</button><button data-q="2">Q2</button><button data-q="3">Q3</button><button data-q="4">Q4</button><button data-q="OT">OT</button>
   </div>
   <div class="card"><h2>Score by quarter — check vs. scorers table</h2><div id="reconcile"></div></div>
+  <div class="card"><h2>Checks <span class="small">(from paired events — what the bench sheet used to be for)</span></h2><div class="chk" id="checks"></div></div>
   <div class="card"><h2 id="statsUsHdr">Our stats</h2><div style="overflow:auto"><table id="tblUs"></table></div>
-    <div class="small" style="margin-top:6px">Shots string uses sheet notation: <b>1</b> = goal, <b>5</b> = penalty (5m) goal, <b>X</b> = miss/save. EXL = exclusions on player (<b>3 = out</b>), P = penalty conceded.</div></div>
+    <div class="small" style="margin-top:6px">Shots string uses sheet notation: <b>1</b> = goal, <b>5</b> = penalty (5m) goal, <b>X</b> = miss/save. EXL = exclusions on player (<b>3 = out</b>), P = penalty conceded. Tap a cap number to review that player's events.</div></div>
   <div class="card"><h2 id="statsOppHdr">Opponent stats</h2><div style="overflow:auto"><table id="tblOpp"></table></div></div>
 </div>
 
 <!-- LOG -->
 <div class="view" id="log">
-  <div class="card"><h2>Event log <span class="small">(newest first — change quarter or delete any row)</span></h2><div id="logList"></div></div>
+  <div class="card"><h2>Event log <span class="small">(newest first — tap a row to edit, insert or delete)</span></h2><div id="logList"></div></div>
 </div>
 
 <!-- EXPORT -->
@@ -250,43 +316,98 @@
   </div>
   <div class="card">
     <button class="danger" onclick="wipe()">Delete this game</button>
-    <span class="small"> — removes it from this device. Back it up first if you want it.</span>
+    <span class="small"> — removes it from this device (button layout is kept). Back it up first if you want it.</span>
   </div>
 </div>
 
+<!-- SETTINGS -->
+<div class="view" id="settings">
+  <div class="card">
+    <h2>Buttons <span class="small">— label, colour, order, size, follow-up. Keys are fixed; exports use keys.</span></h2>
+    <div class="row" style="margin-bottom:8px">
+      <button onclick="exportLayout()">Export layout .json</button>
+      <label class="small">Import layout .json<input type="file" accept=".json" onchange="importLayout(this)"></label>
+      <button class="ghost" onclick="resetLayout()">Reset to default</button>
+    </div>
+    <div class="sec small" style="margin:6px 0"><b id="lyUsHdr">OUR</b> side</div>
+    <div class="btnlist" id="lyUs"></div>
+    <div class="sec small" style="margin:12px 0 6px"><b id="lyOppHdr">OPPONENT</b> side</div>
+    <div class="btnlist" id="lyOpp"></div>
+  </div>
+  <div class="card">
+    <h2>Options</h2>
+    <div class="row">
+      <label class="ck" style="flex-direction:row; align-items:center"><input type="checkbox" id="optGoalBadge"> Goal count badge on caps</label>
+      <label class="ck" style="flex-direction:row; align-items:center"><input type="checkbox" id="optSprint"> Sprint prompt at each quarter start</label>
+      <label>Default cap colour<select id="optCaps"><option value="dark">Dark</option><option value="white">White</option></select></label>
+    </div>
+    <div class="small" style="margin-top:8px">Layout and options are stored on this device separately from games (<code>wpst_layout_v1</code>). App v<span id="verOut"></span>.</div>
+  </div>
+</div>
+
+<div class="ov" id="ov"><div class="sheet" id="sheet"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
 // ===LOGIC=== (pure functions; no DOM)
-const ACTIONS_US = [
-  {k:'goal',   n:'Goal',        c:'g', s:'1'},
-  {k:'pgoal',  n:'5m Goal',     c:'g', s:'5'},
-  {k:'miss',   n:'Miss / Save', c:'m', s:'X', sub:'shot attempt'},
-  {k:'assist', n:'Assist',      c:'a'},
-  {k:'block',  n:'Block',       c:'d', sub:'field / goalie'},
-  {k:'steal',  n:'Steal',       c:'d'},
-  {k:'to',     n:'Turnover',    c:'x'},
-  {k:'exld',   n:'EXL Drawn',   c:'a'},
-  {k:'pend',   n:'5m Drawn',    c:'a', sub:'penalty drawn'},
-  {k:'exl',    n:'Exclusion',   c:'x', sub:'on this player'},
-  {k:'pen',    n:'Penalty',     c:'x', sub:'5m conceded'},
-  {k:'sprintw',n:'Sprint W',    c:'s'},
-  {k:'sprintl',n:'Sprint L',    c:'s'},
-];
-const ACTIONS_OPP = [
-  {k:'goal',  n:'Goal',        c:'g', s:'1'},
-  {k:'pgoal', n:'5m Goal',     c:'g', s:'5'},
-  {k:'miss',  n:'Miss / Save', c:'m', s:'X'},
-  {k:'exld',  n:'EXL Drawn',   c:'a'},
-  {k:'pend',  n:'5m Drawn',    c:'a'},
-  {k:'exl',   n:'Exclusion',   c:'x'},
-  {k:'pen',   n:'Penalty',     c:'x'},
-  {k:'to',    n:'Turnover',    c:'x'},
-  {k:'steal', n:'Steal',       c:'d'},
-];
+const APP_VERSION = '1.1.0';
+// Fixed action definitions — the KEY is the function; exports and the reconcile use keys, never labels.
+const ACTION_DEFS = {
+  goal:   {label:'Goal',        shot:'1', family:'g'},
+  pgoal:  {label:'5m Goal',     shot:'5', family:'g'},
+  miss:   {label:'Miss / Save', shot:'X', family:'m', sub:'shot attempt'},
+  assist: {label:'Assist',      family:'a'},
+  block:  {label:'Block',       family:'d', sub:'field / goalie'},
+  steal:  {label:'Steal',       family:'d'},
+  to:     {label:'Turnover',    family:'x'},
+  exld:   {label:'EXL Drawn',   family:'a'},
+  pend:   {label:'5m Drawn',    family:'a', sub:'penalty drawn'},
+  exl:    {label:'Exclusion',   family:'x', sub:'on this player'},
+  pen:    {label:'Penalty',     family:'x', sub:'5m conceded'},
+  sprintw:{label:'Sprint W',    family:'s'},
+  sprintl:{label:'Sprint L',    family:'s'},
+};
+const FAMILY_COLOR = {g:'#003087', m:'#3A4A6B', a:'#4F6391', d:'#2A5DB8', x:'#6E7373', s:'#5A6E96'};
+const PALETTE = ['#003087','#2A5DB8','#4F6391','#5A6E96','#3A4A6B','#6E7373','#7FA1E8','#B3C1DB','#3A4045'];
+// Which follow-up a key may open, and what the follow-up logs.
+const FOLLOWUPS = {
+  assist: {title:'Assist by?',               side:'us',  logs:'assist', logTeam:'us',  excludePrimaryCap:true},
+  oppExcl:{title:'Excluded: opponent cap?',  side:'opp', logs:'exl',    logTeam:'opp'},
+  oppPen: {title:'Penalty on: opponent cap?',side:'opp', logs:'pen',    logTeam:'opp'},
+  drawnBy:{title:'Drawn by opponent cap?',   side:'opp', logs:'exld',   logTeam:'opp'},
+};
+const ALLOWED_FOLLOWUP = {goal:'assist', pgoal:'assist', exld:'oppExcl', pend:'oppPen', exl:'drawnBy'};
+function defaultLayout(){
+  const us  = [['goal','assist'],['pgoal','assist'],['miss',null],['assist',null],['block',null],['steal',null],['to',null],['exld','oppExcl'],['pend','oppPen'],['exl',null],['pen',null],['sprintw',null],['sprintl',null]];
+  const opp = ['goal','pgoal','miss','exl','pen','to','steal'];
+  const mk=(key,side,order,fu)=>({key, label:ACTION_DEFS[key].label, color:FAMILY_COLOR[ACTION_DEFS[key].family], side, order, enabled:true, followUp:fu||null, size:'1'});
+  return {
+    buttons: us.map(([k,fu],i)=>mk(k,'us',i+1,fu)).concat(opp.map((k,i)=>mk(k,'opp',i+1,null))),
+    showGoalBadge:false, sprintPrompt:true, defaultCaps:'dark'
+  };
+}
+// Sanitise an imported/stored layout against the fixed keys.
+function normalizeLayout(raw){
+  const d = defaultLayout(); if(!raw||typeof raw!=='object') return d;
+  const btns = Array.isArray(raw.buttons)?raw.buttons:[];
+  const out=[]; const seen=new Set();
+  for(const b of btns){ if(!b||!ACTION_DEFS[b.key]||(b.side!=='us'&&b.side!=='opp')) continue; const id=b.side+':'+b.key; if(seen.has(id)) continue; seen.add(id);
+    const fu = (b.side==='us' && b.followUp && ALLOWED_FOLLOWUP[b.key]===b.followUp) ? b.followUp : null;
+    out.push({key:b.key, label:String(b.label||ACTION_DEFS[b.key].label).slice(0,24), color:/^#[0-9a-fA-F]{6}$/.test(b.color||'')?b.color:FAMILY_COLOR[ACTION_DEFS[b.key].family], side:b.side, order:Number(b.order)||out.length+1, enabled:b.enabled!==false, followUp:fu, size:String(b.size)==='2'?'2':'1'}); }
+  // any default button missing from the import is appended, disabled
+  for(const b of d.buttons){ const id=b.side+':'+b.key; if(!seen.has(id)){ out.push(Object.assign({},b,{enabled:false, order:999})); } }
+  return {buttons:out, showGoalBadge:!!raw.showGoalBadge, sprintPrompt:raw.sprintPrompt!==false, defaultCaps:raw.defaultCaps==='white'?'white':'dark'};
+}
+function sideButtons(layout, side, includeDisabled){ return layout.buttons.filter(b=>b.side===side&&(includeDisabled||b.enabled)).sort((a,b)=>a.order-b.order); }
+function labelFor(layout, team, key, cap){
+  if(key==='block' && isGoalieCap(cap)) return 'Save';
+  const b = layout && layout.buttons.find(x=>x.side===team&&x.key===key); return b?b.label:(ACTION_DEFS[key]?ACTION_DEFS[key].label:key);
+}
+const isGoalieCap = cap => /^1[A-Za-z]?$/.test(String(cap||''));
 const QUARTERS = ['1','2','3','4','OT','SO'];
 const SHOT = {goal:'1', pgoal:'5', miss:'X'};
 const isGoal = e => e.action==='goal' || e.action==='pgoal';
+const qName = q => (q==='OT'||q==='SO')?q:'Q'+q;
 
 function capSort(a,b){
   const na = parseInt(a,10), nb = parseInt(b,10);
@@ -341,18 +462,59 @@ function exclusionsByCap(events, team){
   for (const e of events) if (e.team===team && e.action==='exl') m[e.cap]=(m[e.cap]||0)+1;
   return m;
 }
+function goalsByCap(events, team){
+  const m = {};
+  for (const e of events) if (e.team===team && isGoal(e)) m[e.cap]=(m[e.cap]||0)+1;
+  return m;
+}
+// Paired-event helpers. A follow-up carries pair:<id of primary>.
+function pairedOf(events, primary){ return events.filter(x=>x.pair===primary.id); }
+function pairSuffix(events, e){
+  const p = pairedOf(events, e); if(!p.length) return '';
+  return p.map(x=>{ if(x.action==='assist') return `(A: #${x.cap})`; if(x.team!==e.team) return `(→ opp #${x.cap})`; return `(#${x.cap} ${x.action})`; }).join(' ');
+}
+// Special-teams and consistency checks the bench sheet used to provide. Timestamp-based, ~25 s window.
+function specialTeams(events, q){
+  const ev = events.filter(e => q==='all'||String(e.q)===String(q)).map(e=>Object.assign({t:Date.parse(e.ts)||0},e));
+  const within = (a,b) => b.t>=a.t && (b.t-a.t)<=25000;
+  const conv = (exTeam, goalTeam) => { const ex = ev.filter(e=>e.team===exTeam&&e.action==='exl'); let c=0;
+    for(const x of ex){ if(ev.some(g=>g.team===goalTeam&&g.action==='goal'&&within(x,g))) c++; } return {opps:ex.length, conv:c}; };
+  const manUp = conv('opp','us'), manDown = conv('us','opp');
+  const pens = (t) => { const p = ev.filter(e=>e.team!==t&&e.action==='pen'); const drawn = ev.filter(e=>e.team===t&&e.action==='pend').length; const g = ev.filter(e=>e.team===t&&e.action==='pgoal').length; return {called:p.length, drawn, goals:g}; };
+  return {manUp, manDown:{taken:manDown.opps, allowed:manDown.conv, killed:manDown.opps-manDown.conv}, pen:{us:pens('us'), opp:pens('opp')}};
+}
+function consistencyChecks(events, q){
+  const ev = events.filter(e => q==='all'||String(e.q)===String(q));
+  const n = (t,k) => ev.filter(e=>e.team===t&&e.action===k).length;
+  const out = [];
+  const add=(label,a,b,ok)=>out.push({label, a, b, ok: ok===undefined ? a===b : ok});
+  add('Our EXL drawn = their exclusions', n('us','exld'), n('opp','exl'));
+  if(n('opp','exld')) add('Their EXL drawn = our exclusions', n('opp','exld'), n('us','exl'));   // only if drawn-by is being tracked (off by default)
+  add('Our 5m drawn = their penalties', n('us','pend'), n('opp','pen'));
+  if(n('opp','pend')) add('Their 5m drawn = our penalties', n('opp','pend'), n('us','pen'));
+  const assistable = n('us','goal'); add('Our assists ≤ field goals', n('us','assist'), assistable, n('us','assist')<=assistable);
+  add('Our 5m goals ≤ our 5m drawn', n('us','pgoal'), n('us','pend'), n('us','pgoal')<=n('us','pend'));
+  add('Their 5m goals ≤ their 5m drawn', n('opp','pgoal'), n('opp','pend'), n('opp','pgoal')<=n('opp','pend'));
+  return out;
+}
 function mdEscape(s){ return String(s==null?'':s).replace(/\|/g,'\\|'); }
-function toMarkdown(game, events){
+function toMarkdown(game, events, layout){
+  layout = layout || defaultLayout();
   const s = scoreByQuarter(events);
   const usN = game.us||'Us', opN = game.opp||'Opponent';
   let md = `# ${usN} vs ${opN} — ${game.date||''}\n`;
-  md += `**Location:** ${game.loc||''} · **${game.ha||''}** · **${game.lvl||''}** · **Final:** ${usN} ${s.total.us} – ${opN} ${s.total.opp}\n\n`;
+  md += `**Location:** ${game.loc||''} · **${game.ha||''}** · **${game.lvl||''}** · **Caps:** ${game.caps||'—'} · **Final:** ${usN} ${s.total.us} – ${opN} ${s.total.opp}\n\n`;
   md += `## Score by quarter\n| | Q1 | Q2 | Q3 | Q4 | OT | SO | Final |\n|---|---|---|---|---|---|---|---|\n`;
   md += `| ${usN} | ${QUARTERS.map(q=>s[q].us).join(' | ')} | **${s.total.us}** |\n`;
   md += `| ${opN} | ${QUARTERS.map(q=>s[q].opp).join(' | ')} | **${s.total.opp}** |\n\n`;
   md += `## Scoring by quarter\n`;
   for (const q of QUARTERS){ const sc = scorersByQuarter(events,q); if (!sc.us.length && !sc.opp.length) continue;
-    md += `- **${q==='OT'||q==='SO'?q:'Q'+q}:** ${usN}: ${sc.us.join(', ')||'—'} · ${opN}: ${sc.opp.join(', ')||'—'}\n`; }
+    md += `- **${qName(q)}:** ${usN}: ${sc.us.join(', ')||'—'} · ${opN}: ${sc.opp.join(', ')||'—'}\n`; }
+  const st = specialTeams(events,'all');
+  md += `\n## Special teams (app, paired events — timeline check still applies)\n`;
+  md += `- Man-up: ${st.manUp.conv}/${st.manUp.opps} · Man-down killed: ${st.manDown.killed}/${st.manDown.taken} · 5m: ${usN} ${st.pen.us.goals}/${st.pen.us.drawn} drawn (${st.pen.us.called} called on ${opN}) · ${opN} ${st.pen.opp.goals}/${st.pen.opp.drawn}\n`;
+  const ck = consistencyChecks(events,'all').filter(c=>!c.ok);
+  md += ck.length ? `- Checks failing: ${ck.map(c=>`${c.label} (${c.a} vs ${c.b})`).join('; ')}\n` : `- All consistency checks pass.\n`;
   md += `\n## ${usN} — player stats\n`;
   md += `| # | Athlete | Goals | Shots | Att | Assists | Blocks | Steals | TO | EXL Drawn | 5m Drawn | EXL | P | Sprint W-L |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n`;
   const rows = computeStats(events, game.rosterUs, 'us', 'all'); const t = totals(rows);
@@ -364,43 +526,57 @@ function toMarkdown(game, events){
     for (const r of ro) md += `| ${r.cap} | ${r.goals||''} | ${r.shots} | ${r.att||''} | ${r.exld||''} | ${r.pend||''} | ${r.exl||''} | ${r.pen||''} | ${r.steals||''} | ${r.to||''} |\n`;
     md += `| **Total** | **${to.goals}** | | **${to.att}** | **${to.exld}** | **${to.pend}** | **${to.exl}** | **${to.pen}** | **${to.steals}** | **${to.to}** |\n\n`;
   }
-  md += `## Event log\n| # | Q | Team | Cap | Event |\n|---|---|---|---|---|\n`;
-  events.forEach((e,i)=>{ md += `| ${i+1} | ${e.q} | ${e.team==='us'?usN:opN} | ${e.cap} | ${actionName(e)} |\n`; });
-  md += `\n_Notation: 1 = goal, 5 = 5m/penalty goal, X = miss/save. Logged with WP Stat Tracker._\n`;
+  md += `## Event log\n| # | Q | Team | Cap | Event | Note |\n|---|---|---|---|---|---|\n`;
+  events.forEach((e,i)=>{ const note=[pairSuffix(events,e), e.pair?'paired':'', e.edited?'edited':'', e.inserted?'inserted':''].filter(Boolean).join(' ');
+    md += `| ${i+1} | ${e.q} | ${e.team==='us'?usN:opN} | ${e.cap} | ${labelFor(layout,e.team,e.action,e.cap)} | ${note} |\n`; });
+  md += `\n_Notation: 1 = goal, 5 = 5m/penalty goal, X = miss/save. Logged with WP Stat Tracker v${APP_VERSION}._\n`;
   return md;
 }
-function actionName(e){ const list = e.team==='us'?ACTIONS_US:ACTIONS_OPP; const a = list.find(x=>x.k===e.action); return a?a.n:e.action; }
 function toCSV(game, events){
   const esc = v => '"'+String(v==null?'':v).replace(/"/g,'""')+'"';
-  let out = ['seq','date','us','opp','quarter','team','cap','name','action','timestamp'].join(',')+'\n';
+  let out = ['seq','date','us','opp','quarter','team','cap','name','action','timestamp','pair','edited','orig'].join(',')+'\n';
   events.forEach((e,i)=>{ const r=(e.team==='us'?game.rosterUs:game.rosterOpp).find(p=>String(p.cap)===String(e.cap));
-    out += [i+1,game.date,game.us,game.opp,e.q,e.team,e.cap,r?r.name:'',e.action,e.ts].map(esc).join(',')+'\n'; });
+    out += [i+1,game.date,game.us,game.opp,e.q,e.team,e.cap,r?r.name:'',e.action,e.ts,e.pair||'',e.edited?'1':'',e.orig?JSON.stringify(e.orig):''].map(esc).join(',')+'\n'; });
   return out;
+}
+// Apply an edit to an event, capturing the original values once.
+function applyEdit(e, changes){
+  const fields=['q','team','cap','action'];
+  const diff = fields.filter(f=>changes[f]!==undefined && String(changes[f])!==String(e[f]));
+  if(!diff.length) return false;
+  if(!e.orig) e.orig = {q:e.q, team:e.team, cap:e.cap, action:e.action};
+  for(const f of diff) e[f]=changes[f];
+  e.edited=true; return true;
 }
 // ===END LOGIC===
 
-if (typeof module!=='undefined') module.exports = {computeStats,totals,scoreByQuarter,scorersByQuarter,exclusionsByCap,toMarkdown,toCSV,ACTIONS_US,ACTIONS_OPP,QUARTERS};
+if (typeof module!=='undefined') module.exports = {APP_VERSION,ACTION_DEFS,FOLLOWUPS,ALLOWED_FOLLOWUP,defaultLayout,normalizeLayout,sideButtons,labelFor,isGoalieCap,computeStats,totals,scoreByQuarter,scorersByQuarter,exclusionsByCap,goalsByCap,pairedOf,pairSuffix,specialTeams,consistencyChecks,toMarkdown,toCSV,applyEdit,QUARTERS};
 if (typeof document!=='undefined') (function(){
 // ===UI===
 // Caps only — no names in the public file. Import roster-*.json (kept private) to load names once; they persist on-device.
 const DEFAULT_ROSTER = ['1','1A','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','21'].map(c=>({cap:c,name:''}));
-const KEY='wpst_v1';
-let store = {games:{}, current:null, roster:null};
-let G = null;              // current game {id,date,us,opp,loc,ha,lvl,rosterUs,rosterOpp,events,q}
+const KEY='wpst_v1', LKEY='wpst_layout_v1';
+let store = {games:{}, current:null, roster:null, usShort:''};
+let L = defaultLayout();
+let G = null;              // current game {id,date,us,usShort,opp,loc,ha,lvl,caps,rosterUs,rosterOpp,events,q,locked,sprintAsked}
 let selected = null;       // {team,cap}
 let lastTap = 0;
 
-function safeLoad(){ try{ const s=localStorage.getItem(KEY); if(s) store=JSON.parse(s);}catch(e){} }
-function save(){ try{ if(G){ store.games[G.id]=G; store.current=G.id; store.roster=G.rosterUs; } localStorage.setItem(KEY, JSON.stringify(store)); el('saveState').textContent='saved '+new Date().toLocaleTimeString(); }catch(e){ el('saveState').textContent='⚠ not saved (storage unavailable) — use Backup .json'; } }
+function safeLoad(){ try{ const s=localStorage.getItem(KEY); if(s) store=JSON.parse(s); }catch(e){} try{ const l=localStorage.getItem(LKEY); L=normalizeLayout(l?JSON.parse(l):null); }catch(e){ L=defaultLayout(); } }
+function save(){ try{ if(G){ store.games[G.id]=G; store.current=G.id; store.roster=G.rosterUs; store.usShort=G.usShort||''; store.us=G.us; } localStorage.setItem(KEY, JSON.stringify(store)); el('saveState').textContent='saved '+new Date().toLocaleTimeString(); }catch(e){ el('saveState').textContent='⚠ not saved (storage unavailable) — use Backup .json'; } }
+function saveLayout(){ try{ localStorage.setItem(LKEY, JSON.stringify(L)); }catch(e){} }
 function el(id){ return document.getElementById(id); }
 function today(){ const d=new Date(); return d.toISOString().slice(0,10); }
-function blankGame(){ return {id:'g'+Date.now(), date:today(), us:'St. Xavier', opp:'', loc:'', ha:'Home', lvl:'Varsity',
+function migrate(g){ if(!g.q) g.q='1'; if(!g.locked) g.locked={}; if(!g.sprintAsked) g.sprintAsked={}; if(!g.caps) g.caps=L.defaultCaps; if(g.usShort===undefined) g.usShort=store.usShort||''; return g; }
+function blankGame(){ return migrate({id:'g'+Date.now(), date:today(), us:store.us||'St. Xavier', usShort:store.usShort||'', opp:'', loc:'', ha:'Home', lvl:'Varsity', caps:L.defaultCaps,
   rosterUs: (store.roster && store.roster.length) ? JSON.parse(JSON.stringify(store.roster)) : JSON.parse(JSON.stringify(DEFAULT_ROSTER)),
-  rosterOpp: Array.from({length:15},(_,i)=>({cap:String(i+1),name:''})), events:[], q:'1'}; }
+  rosterOpp: Array.from({length:15},(_,i)=>({cap:String(i+1),name:''})), events:[], q:'1'}); }
+const usName = () => G.usShort || G.us || 'US';
+const oppName = () => G.opp || 'OPP';
 
 // ---- setup ----
-function bindHeader(){ el('gDate').value=G.date||today(); el('gUs').value=G.us||''; el('gOpp').value=G.opp||''; el('gLoc').value=G.loc||''; el('gHA').value=G.ha||'Home'; el('gLvl').value=G.lvl||'Varsity'; }
-['gDate','gUs','gOpp','gLoc','gHA','gLvl'].forEach(id=>{ document.addEventListener('DOMContentLoaded',()=>{ el(id).addEventListener('change',()=>{ G.date=el('gDate').value; G.us=el('gUs').value; G.opp=el('gOpp').value; G.loc=el('gLoc').value; G.ha=el('gHA').value; G.lvl=el('gLvl').value; save(); renderSavedList(); }); }); });
+function bindHeader(){ el('gDate').value=G.date||today(); el('gUs').value=G.us||''; el('gUsShort').value=G.usShort||''; el('gOpp').value=G.opp||''; el('gLoc').value=G.loc||''; el('gHA').value=G.ha||'Home'; el('gLvl').value=G.lvl||'Varsity'; el('gCaps').value=G.caps||'dark'; }
+['gDate','gUs','gUsShort','gOpp','gLoc','gHA','gLvl','gCaps'].forEach(id=>{ document.addEventListener('DOMContentLoaded',()=>{ el(id).addEventListener('change',()=>{ G.date=el('gDate').value; G.us=el('gUs').value; G.usShort=el('gUsShort').value.trim(); G.opp=el('gOpp').value; G.loc=el('gLoc').value; G.ha=el('gHA').value; G.lvl=el('gLvl').value; G.caps=el('gCaps').value; save(); renderSavedList(); }); }); });
 function renderRoster(team){
   const list = team==='us'?G.rosterUs:G.rosterOpp; const box = el(team==='us'?'rosterUs':'rosterOpp'); box.innerHTML='';
   list.forEach((p,i)=>{ const d=document.createElement('div'); d.className='p';
@@ -410,31 +586,32 @@ function renderRoster(team){
 }
 window.addPlayer = t => { (t==='us'?G.rosterUs:G.rosterOpp).push({cap:'',name:''}); renderRoster(t); };
 window.loadDefaultRoster = () => { G.rosterUs=JSON.parse(JSON.stringify(DEFAULT_ROSTER)); save(); renderRoster('us'); };
+window.rosterFromLast = () => { const others=Object.values(store.games).filter(g=>g.id!==G.id).sort((a,b)=>(b.date||'').localeCompare(a.date||'')); const src=others[0]?others[0].rosterUs:store.roster; if(!src||!src.length){ toast('No previous roster on this device'); return; } G.rosterUs=JSON.parse(JSON.stringify(src)); save(); renderRoster('us'); toast(others[0]?`Roster from ${others[0].date} vs ${others[0].opp||'?'}`:'Roster restored'); };
 window.genOpp = () => { G.rosterOpp=Array.from({length:15},(_,i)=>({cap:String(i+1),name:''})); save(); renderRoster('opp'); };
 window.clearRoster = t => { if(!confirm('Clear opponent caps?')) return; G.rosterOpp=[]; save(); renderRoster('opp'); };
 window.sortRoster = t => { (t==='us'?G.rosterUs:G.rosterOpp).sort((a,b)=>capSort(a.cap,b.cap)); save(); renderRoster(t); };
 window.newGame = () => { if(G && G.events.length && !confirm('Start a new game? Current game stays saved in the list.')) return; store.roster=G?G.rosterUs:store.roster; G=blankGame(); save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); toast('New game'); };
-window.loadSaved = id => { if(!id) return; G=store.games[id]; store.current=id; save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderAll(); toast('Loaded'); };
+window.loadSaved = id => { if(!id) return; G=migrate(store.games[id]); store.current=id; save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderAll(); toast('Loaded'); };
 function renderSavedList(){ const s=el('savedGames'); s.innerHTML='<option value="">— load —</option>'; Object.values(store.games).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).forEach(g=>{ const o=document.createElement('option'); o.value=g.id; o.textContent=`${g.date} ${g.us||''} vs ${g.opp||'?'} (${g.events.length} ev)`; if(G&&g.id===G.id) o.selected=true; s.appendChild(o); }); }
-window.startGame = () => { G.rosterUs=G.rosterUs.filter(p=>p.cap!==''); G.rosterOpp=G.rosterOpp.filter(p=>p.cap!==''); save(); show('game'); wake(); };
+window.startGame = () => { G.rosterUs=G.rosterUs.filter(p=>p.cap!==''); G.rosterOpp=G.rosterOpp.filter(p=>p.cap!==''); save(); show('game'); wake(); maybeSprint(G.q); };
 
 // ---- game ----
-function show(v){ document.querySelectorAll('.tabs button[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id===v)); if(v==='stats') renderStats(); if(v==='log') renderLog(); if(v==='export') renderExport(); if(v==='game') renderGame(); }
+function show(v){ document.querySelectorAll('.tabs button[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id===v)); if(v==='stats') renderStats(); if(v==='log') renderLog(); if(v==='export') renderExport(); if(v==='game') renderGame(); if(v==='settings') renderSettings(); }
 document.addEventListener('click',e=>{ const b=e.target.closest('.tabs button[data-v]'); if(b) show(b.dataset.v); });
 let phoneTeam='us';
 document.addEventListener('click',e=>{ const b=e.target.closest('.teamtoggle button[data-t]'); if(b){ phoneTeam=b.dataset.t; selected=null; renderGame(); } });
 function renderGame(){
-  el('hdrUs').textContent=(G.us||'US').toUpperCase(); el('hdrOpp').textContent=(G.opp||'OPP').toUpperCase();
-  document.querySelectorAll('.teamtoggle button[data-t]').forEach(b=>{ b.classList.toggle('on',b.dataset.t===phoneTeam); b.textContent=(b.dataset.t==='us'?(G.us||'US'):(G.opp||'OPP')).toUpperCase(); });
+  el('hdrUs').textContent=usName().toUpperCase(); el('hdrOpp').textContent=oppName().toUpperCase();
+  document.querySelectorAll('.teamtoggle button[data-t]').forEach(b=>{ b.classList.toggle('on',b.dataset.t===phoneTeam); b.textContent=(b.dataset.t==='us'?usName():oppName()).toUpperCase(); });
   el('colUs').classList.toggle('hide',phoneTeam!=='us'); el('colOpp').classList.toggle('hide',phoneTeam!=='opp');
-  document.querySelectorAll('.qbar button[data-q]').forEach(b=>b.classList.toggle('on',b.dataset.q===String(G.q)));
-  const exUs=exclusionsByCap(G.events,'us'), exOpp=exclusionsByCap(G.events,'opp');
-  const mk=(team,list,ex)=>{ const box=el(team==='us'?'capsUs':'capsOpp'); box.innerHTML='';
+  document.querySelectorAll('.qbar button[data-q]').forEach(b=>{ b.classList.toggle('on',b.dataset.q===String(G.q)); b.classList.toggle('lock',!!G.locked[b.dataset.q]); });
+  const exUs=exclusionsByCap(G.events,'us'), exOpp=exclusionsByCap(G.events,'opp'); const glUs=goalsByCap(G.events,'us'), glOpp=goalsByCap(G.events,'opp');
+  const mk=(team,list,ex,gl)=>{ const box=el(team==='us'?'capsUs':'capsOpp'); box.innerHTML='';
     list.forEach(p=>{ const b=document.createElement('button'); b.className='cap '+team+(selected&&selected.team===team&&selected.cap===p.cap?' sel':'');
-      const n=ex[p.cap]||0; b.innerHTML=`${p.cap}${p.name?`<small>${p.name}</small>`:''}${n?`<span class="exl${n>=3?' out':''}">${n>=3?'OUT':'E'+n}</span>`:''}`;
+      const n=ex[p.cap]||0, g=gl[p.cap]||0; b.innerHTML=`${p.cap}${p.name?`<small>${p.name}</small>`:''}${n?`<span class="exl${n>=3?' out':''}">${n>=3?'OUT':'E'+n}</span>`:''}${(L.showGoalBadge&&g)?`<span class="gl">${g}</span>`:''}`;
       b.addEventListener('click',()=>selectCap(team,p.cap)); box.appendChild(b); }); };
-  mk('us',G.rosterUs,exUs); mk('opp',G.rosterOpp,exOpp);
-  renderActions(); renderQScore(); renderFouls(); renderScore();
+  mk('us',G.rosterUs,exUs,glUs); mk('opp',G.rosterOpp,exOpp,glOpp);
+  renderActions(); renderQScore(); renderFouls(); renderScore(); renderLast3();
 }
 // Running fouls strip: every cap with an exclusion or penalty, both teams, OUT flagged. What you check the table against.
 function renderFouls(){
@@ -443,92 +620,241 @@ function renderFouls(){
     const tot=Object.values(ex).reduce((a,b)=>a+b,0);
     const items=caps.map(c=>{ const n=ex[c]||0, p=pen[c]||0; const cls=n>=3?'out':(n===2?'e2':''); return `<span class="c ${cls}">#${c}${n?' '+(n>=3?'OUT':'E'+n):''}${p?` <span class="p">P${p>1?p:''}</span>`:''}</span>`; }).join('');
     return `<div class="${team}"><b class="t">${name} · ${tot} EXL</b>${items||'<span class="none">none</span>'}</div>`; };
-  el('fouls').innerHTML=side('us',G.us||'US')+side('opp',G.opp||'OPP');
+  el('fouls').innerHTML=side('us',usName())+side('opp',oppName());
+}
+function renderLast3(){
+  const box=el('last3'); const last=G.events.slice(-3).reverse();
+  if(!last.length){ box.innerHTML='<div class="empty">Last three events show here — tap one to edit or delete.</div>'; return; }
+  box.innerHTML=''; last.forEach(e=>{ const d=document.createElement('div'); d.className='ev'+(e.edited?' edited':'');
+    d.innerHTML=`<span class="q">${qName(e.q)}</span><span class="t ${e.team}">${e.team==='us'?'US':'OPP'}</span><b>#${e.cap}</b><span>${labelFor(L,e.team,e.action,e.cap)}</span><span class="pr">${pairSuffix(G.events,e)}${e.pair?' ↳':''}</span><span class="ed">${e.edited?'edited':'edit'}</span>`;
+    d.addEventListener('click',()=>openEdit(e.id)); box.appendChild(d); });
 }
 function selectCap(team,cap){ selected=(selected&&selected.team===team&&selected.cap===cap)?null:{team,cap}; renderGame(); }
 window.clearSel=()=>{ selected=null; renderGame(); };
+function actBtn(b, cap, onClick){ const x=document.createElement('button'); x.className='act'+(b.size==='2'?' w2':''); x.style.background=b.color; const def=ACTION_DEFS[b.key]; const lbl=(b.key==='block'&&isGoalieCap(cap))?'Save':b.label; x.innerHTML=lbl+(def.sub?`<small>${def.sub}</small>`:''); x.dataset.k=b.key; x.addEventListener('click',onClick); return x; }
 function renderActions(){
   const box=el('actions'); box.innerHTML=''; const sb=el('selBox');
+  if(G.locked[G.q]){ sb.innerHTML=`<span class="small">${qName(G.q)} is locked. Tap ${qName(G.q)} above to review or unlock.</span>`; return; }
   if(!selected){ sb.innerHTML='<span class="small">Tap a cap number, then an action.</span>'; return; }
   const list=selected.team==='us'?G.rosterUs:G.rosterOpp; const p=list.find(x=>x.cap===selected.cap)||{};
-  sb.innerHTML=`<span class="who" style="color:${selected.team==='us'?'var(--usSel)':'var(--oppSel)'}">#${selected.cap}</span> ${p.name||(selected.team==='us'?(G.us||'us'):(G.opp||'opp'))} <span class="small">· Q${G.q}</span><button class="clear" onclick="clearSel()">clear</button>`;
-  (selected.team==='us'?ACTIONS_US:ACTIONS_OPP).forEach(a=>{ const b=document.createElement('button'); b.className='act '+a.c; b.innerHTML=a.n+(a.sub?`<small>${a.sub}</small>`:''); b.addEventListener('click',()=>logEvent(a.k)); box.appendChild(b); });
+  sb.innerHTML=`<span class="who" style="color:${selected.team==='us'?'var(--usSel)':'var(--oppSel)'}">#${selected.cap}</span> ${p.name||(selected.team==='us'?usName():oppName())} <span class="small">· ${qName(G.q)}</span><button class="clear" onclick="clearSel()">clear</button>`;
+  sideButtons(L,selected.team).forEach(b=>box.appendChild(actBtn(b,selected.cap,()=>logEvent(b.key))));
 }
+function newEvent(q,team,cap,action,extra){ return Object.assign({id:'e'+Date.now()+Math.random().toString(36).slice(2,6), q, team, cap, action, ts:new Date().toISOString()}, extra||{}); }
 function logEvent(k){
   const now=Date.now(); if(now-lastTap<250) return; lastTap=now;
   if(!selected) return;
-  const e={id:'e'+now+Math.random().toString(36).slice(2,6), q:G.q, team:selected.team, cap:selected.cap, action:k, ts:new Date().toISOString()};
+  if(G.locked[G.q]){ toast(`${qName(G.q)} is locked — unlock in the quarter review`); return; }
+  const e=newEvent(G.q,selected.team,selected.cap,k);
   G.events.push(e); save();
-  toast(`Q${G.q} · #${e.cap} ${actionName(e)}${isGoal(e)?'  →  '+score():''}`);
+  const b=L.buttons.find(x=>x.side===e.team&&x.key===k);
   selected=null; renderGame();
+  if(b&&b.followUp&&FOLLOWUPS[b.followUp]) openFollowUp(e,b.followUp);
 }
-window.undo=()=>{ const e=G.events.pop(); if(!e){toast('Nothing to undo');return;} save(); toast(`Undid: #${e.cap} ${actionName(e)}`); renderGame(); };
-document.addEventListener('click',e=>{ const b=e.target.closest('.qbar button[data-q]'); if(b){ G.q=b.dataset.q; save(); renderGame(); } });
+window.undo=()=>{ const e=G.events.pop(); if(!e){toast('Nothing to undo');return;} save(); toast(`Undid: #${e.cap} ${labelFor(L,e.team,e.action,e.cap)}`); renderGame(); };
+document.addEventListener('click',e=>{ const b=e.target.closest('.qbar button[data-q]'); if(b) tapQuarter(b.dataset.q); });
+function tapQuarter(q){
+  if(q===String(G.q)){ openBreak(q, null); return; }              // review current quarter mid-way
+  if(G.locked[q]){ openBreak(q, null); return; }                   // review / unlock a closed quarter
+  const curHas=G.events.some(e=>String(e.q)===String(G.q));
+  if(!curHas || G.locked[G.q]){ gotoQuarter(q); return; }         // nothing to close
+  openBreak(String(G.q), q);                                      // "Close Qn?" then move
+}
+function gotoQuarter(q){ G.q=q; selected=null; save(); closeSheet(); renderGame(); maybeSprint(q); }
 function score(){ const s=scoreByQuarter(G.events); return `${s.total.us}–${s.total.opp}`; }
 function renderScore(){ const s=scoreByQuarter(G.events); el('scUs').textContent=s.total.us; el('scOpp').textContent=s.total.opp; }
-function renderQScore(){ const s=scoreByQuarter(G.events); el('qscore').innerHTML=QUARTERS.map(q=>`<div class="${String(G.q)===q?'on':''}">${q.length>1?q:'Q'+q}<b>${s[q].us}–${s[q].opp}</b></div>`).join('')+`<div>Total<b>${s.total.us}–${s.total.opp}</b></div>`; }
+function renderQScore(){ const s=scoreByQuarter(G.events); el('qscore').innerHTML=QUARTERS.map(q=>`<div class="${String(G.q)===q?'on':''}">${qName(q)}<b>${s[q].us}–${s[q].opp}</b></div>`).join('')+`<div>Total<b>${s.total.us}–${s.total.opp}</b></div>`; }
 async function wake(){ try{ if('wakeLock' in navigator){ await navigator.wakeLock.request('screen'); } }catch(e){} }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') wake(); });
+
+// ---- sheets (modal) ----
+let sheetAfter=null; // callback when a sheet closes (used to return to the break review after an edit)
+function openSheet(html){ el('sheet').innerHTML=html; el('ov').classList.add('on'); }
+function closeSheet(){ el('ov').classList.remove('on'); el('sheet').innerHTML=''; const f=sheetAfter; sheetAfter=null; if(f) f(); }
+window.closeSheet=closeSheet;
+document.addEventListener('click',e=>{ if(e.target===el('ov')) closeSheet(); });
+function capGridHtml(team, caps, selectedCap, cls){ return `<div class="grid">${caps.map(p=>`<button class="cap ${team}${String(p.cap)===String(selectedCap)?' sel':''} ${cls||''}" data-cap="${p.cap}">${p.cap}${p.name?`<small>${p.name}</small>`:''}</button>`).join('')}</div>`; }
+
+// Follow-up after a primary event (§2). One tap answers, Skip is always one tap.
+function openFollowUp(primary, kind){
+  const fu=FOLLOWUPS[kind]; const roster = fu.side==='us'?G.rosterUs:G.rosterOpp;
+  const caps = fu.excludePrimaryCap ? roster.filter(p=>String(p.cap)!==String(primary.cap)) : roster;
+  openSheet(`<h3>#${primary.cap} ${labelFor(L,primary.team,primary.action,primary.cap)} <span class="small">${qName(primary.q)}${isGoal(primary)?' · '+score():''}</span></h3>
+    <div class="sec">${fu.title}</div>${capGridHtml(fu.side, caps, null, 'fu')}
+    <div class="foot"><button class="sp" id="fuSkip">Skip</button></div>`);
+  el('sheet').querySelectorAll('.cap.fu').forEach(b=>b.addEventListener('click',()=>{ const e=newEvent(primary.q, fu.logTeam, b.dataset.cap, fu.logs, {pair:primary.id}); G.events.push(e); save(); closeSheet(); renderGame(); }));
+  el('fuSkip').addEventListener('click',()=>{ closeSheet(); });
+}
+
+// Sprint prompt at quarter start (§1).
+function maybeSprint(q){
+  if(!L.sprintPrompt || q==='SO' || G.sprintAsked[q] || G.locked[q]) return;
+  if(G.events.some(e=>String(e.q)===String(q))) return;
+  G.sprintAsked[q]=true; save();
+  let cap=null;
+  const render=()=>{ openSheet(`<h3>${qName(q)} sprint <span class="small">who swam?</span></h3>${capGridHtml('us',G.rosterUs,cap,'sp')}
+    <div class="foot"><button class="primary" id="spW" ${cap?'':'disabled'}>Sprint W</button><button class="primary" id="spL" style="background:#3A4A6B" ${cap?'':'disabled'}>Sprint L</button><button class="ghost" id="spSkip">Skip</button></div>`);
+    el('sheet').querySelectorAll('.cap.sp').forEach(b=>b.addEventListener('click',()=>{ cap=b.dataset.cap; render(); }));
+    const log=k=>{ G.events.push(newEvent(q,'us',cap,k)); save(); closeSheet(); renderGame(); };
+    el('spW').addEventListener('click',()=>log('sprintw')); el('spL').addEventListener('click',()=>log('sprintl')); el('spSkip').addEventListener('click',closeSheet); };
+  render();
+}
+
+// Edit sheet (§1): cap, action, quarter, team, delete, insert before/after.
+function openEdit(id){
+  const e=G.events.find(x=>x.id===id); if(!e) return;
+  const idx=G.events.indexOf(e);
+  let d={q:e.q, team:e.team, cap:e.cap, action:e.action};
+  const render=()=>{
+    const roster=d.team==='us'?G.rosterUs:G.rosterOpp; const btns=sideButtons(L,d.team,true).filter(b=>b.enabled||b.key===d.action);
+    if(!btns.some(b=>b.key===d.action)&&ACTION_DEFS[d.action]) btns.push({key:d.action,label:ACTION_DEFS[d.action].label,color:FAMILY_COLOR[ACTION_DEFS[d.action].family],size:'1'});
+    const paired=pairedOf(G.events,e); const primary=e.pair?G.events.find(x=>x.id===e.pair):null;
+    openSheet(`<h3>Edit #${idx+1} <span class="small">${new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}${e.orig?` · was ${qName(e.orig.q)} ${e.orig.team==='us'?'US':'OPP'} #${e.orig.cap} ${e.orig.action}`:''}${primary?` · follow-up of #${G.events.indexOf(primary)+1}`:''}${paired.length?` · has ${paired.length} paired`:''}</span></h3>
+      <div class="sec">Quarter</div><div class="qg">${QUARTERS.map(q=>`<button data-q="${q}" class="${q===String(d.q)?'on':''}${G.locked[q]?' lk':''}">${qName(q)}${G.locked[q]?' 🔒':''}</button>`).join('')}</div>
+      <div class="sec">Team</div><div class="qg"><button data-team="us" class="${d.team==='us'?'on':''}">${usName()}</button><button data-team="opp" class="${d.team==='opp'?'on':''}">${oppName()}</button></div>
+      <div class="sec">Cap</div>${capGridHtml(d.team,roster,d.cap,'ed')}
+      <div class="sec">Action</div><div class="agrid" id="edActs"></div>
+      <div class="foot"><button class="primary" id="edSave">Save</button><button id="edBefore">Insert before</button><button id="edAfter">Insert after</button><button class="danger" id="edDel">Delete</button><button class="ghost" id="edCancel">Cancel</button></div>`);
+    const sh=el('sheet');
+    sh.querySelectorAll('.qg button[data-q]').forEach(b=>b.addEventListener('click',()=>{ d.q=b.dataset.q; render(); }));
+    sh.querySelectorAll('.qg button[data-team]').forEach(b=>b.addEventListener('click',()=>{ if(d.team!==b.dataset.team){ d.team=b.dataset.team; d.cap=null; } render(); }));
+    sh.querySelectorAll('.cap.ed').forEach(b=>b.addEventListener('click',()=>{ d.cap=b.dataset.cap; render(); }));
+    const ag=el('edActs'); btns.forEach(b=>{ const x=actBtn(b,d.cap,()=>{ d.action=b.key; render(); }); if(b.key===d.action) x.classList.add('sel'); ag.appendChild(x); });
+    el('edSave').addEventListener('click',()=>{ if(!d.cap){ toast('Pick a cap'); return; } applyEdit(e,d); save(); closeSheet(); renderAll(); });
+    el('edDel').addEventListener('click',()=>{ const msg=paired.length?`Delete this event and its ${paired.length} paired follow-up${paired.length>1?'s':''}?`:'Delete this event?'; if(!confirm(msg)) return; const ids=new Set([e.id,...paired.map(p=>p.id)]); G.events=G.events.filter(x=>!ids.has(x.id)); save(); closeSheet(); renderAll(); });
+    const ins=(after)=>{ const n=newEvent(e.q,e.team,e.cap,e.action,{inserted:true}); n.ts=new Date(Date.parse(e.ts)+(after?1:-1)*1000).toISOString(); G.events.splice(idx+(after?1:0),0,n); save(); sheetAfter=null; openEdit(n.id); };
+    el('edBefore').addEventListener('click',()=>ins(false)); el('edAfter').addEventListener('click',()=>ins(true));
+    el('edCancel').addEventListener('click',closeSheet);
+  };
+  render();
+}
+window.openEdit=openEdit;
+
+// Break review (§1): the quarter's events by team, editable; goals/EXL/P per cap; score. Confirm → lock.
+function openBreak(q, nextQ){
+  const render=()=>{
+    const ev=G.events.filter(e=>String(e.q)===String(q)); const s=scoreByQuarter(G.events)[q]; const locked=!!G.locked[q];
+    const lines=team=>ev.filter(e=>e.team===team).map(e=>`<div class="ev${e.edited?' edited':''}" data-id="${e.id}"><b>#${e.cap}</b><span>${labelFor(L,e.team,e.action,e.cap)}</span><span class="m">${pairSuffix(G.events,e)}${e.pair?' ↳':''}</span><span class="ed">${e.edited?'edited':'edit'}</span></div>`).join('')||'<div class="small">none</div>';
+    const per=team=>{ const rows=computeStats(ev,team==='us'?G.rosterUs:G.rosterOpp,team,q).filter(r=>r.goals||r.exl||r.pen); return rows.map(r=>`#${r.cap}${r.goals?' G'+r.goals:''}${r.exl?' E'+r.exl:''}${r.pen?' P'+r.pen:''}`).join(' · ')||'—'; };
+    const ck=consistencyChecks(G.events,q).filter(c=>!c.ok); const st=specialTeams(G.events,q);
+    openSheet(`<h3>${nextQ?`Close ${qName(q)}?`:`${qName(q)} review`} <span class="small">${usName()} ${s.us} – ${oppName()} ${s.opp}${locked?' · locked':''}</span></h3>
+      <div class="sum"><div class="us"><b class="t">${usName()}</b>${per('us')}</div><div class="opp"><b class="t">${oppName()}</b>${per('opp')}</div></div>
+      <div class="chk">${ck.length?ck.map(c=>`<div class="no">✗ ${c.label}: ${c.a} vs ${c.b}</div>`).join(''):'<div class="ok">✓ drawn = called · assists ≤ goals · 5m consistent</div>'}<div class="small">Man-up ${st.manUp.conv}/${st.manUp.opps} · man-down killed ${st.manDown.killed}/${st.manDown.taken}</div></div>
+      <div class="sec">${usName()} — ${ev.filter(e=>e.team==='us').length} events (tap to edit)</div><div class="lines">${lines('us')}</div>
+      <div class="sec">${oppName()} — ${ev.filter(e=>e.team==='opp').length} events</div><div class="lines">${lines('opp')}</div>
+      <div class="foot">${nextQ?`<button class="primary" id="brClose">Close ${qName(q)} → ${qName(nextQ)}</button>`:(locked?`<button class="primary" id="brUnlock">Unlock ${qName(q)}</button>`:`<button class="primary" id="brLock">Close &amp; lock ${qName(q)}</button>`)}<button class="ghost" id="brCancel">${nextQ?'Stay in '+qName(q):'Done'}</button></div>`);
+    el('sheet').querySelectorAll('.lines .ev').forEach(d=>d.addEventListener('click',()=>{ sheetAfter=()=>openBreak(q,nextQ); openEdit(d.dataset.id); }));
+    const lock=()=>{ G.locked[q]=true; save(); };
+    if(el('brClose')) el('brClose').addEventListener('click',()=>{ lock(); gotoQuarter(nextQ); });
+    if(el('brLock')) el('brLock').addEventListener('click',()=>{ lock(); closeSheet(); renderGame(); });
+    if(el('brUnlock')) el('brUnlock').addEventListener('click',()=>{ delete G.locked[q]; G.q=q; save(); closeSheet(); renderGame(); toast(`${qName(q)} unlocked`); });
+    el('brCancel').addEventListener('click',closeSheet);
+  };
+  render();
+}
 
 // ---- stats ----
 let qf='all';
 document.addEventListener('click',e=>{ const b=e.target.closest('#qfilt button'); if(b){ qf=b.dataset.q; document.querySelectorAll('#qfilt button').forEach(x=>x.classList.toggle('on',x===b)); renderStats(); } });
 function renderStats(){
   const s=scoreByQuarter(G.events); const usN=G.us||'Us', opN=G.opp||'Opp';
-  let h=`<table><tr><th class="l"></th>${QUARTERS.map(q=>`<th>${q.length>1?q:'Q'+q}</th>`).join('')}<th>Final</th></tr>`;
+  let h=`<table><tr><th class="l"></th>${QUARTERS.map(q=>`<th>${qName(q)}</th>`).join('')}<th>Final</th></tr>`;
   h+=`<tr><td class="l"><b style="color:var(--usSel)">${usN}</b></td>${QUARTERS.map(q=>`<td>${s[q].us}</td>`).join('')}<td><b>${s.total.us}</b></td></tr>`;
   h+=`<tr><td class="l"><b style="color:var(--oppSel)">${opN}</b></td>${QUARTERS.map(q=>`<td>${s[q].opp}</td>`).join('')}<td><b>${s.total.opp}</b></td></tr></table>`;
-  h+=`<div class="small" style="margin-top:8px">`; for(const q of QUARTERS){ const sc=scorersByQuarter(G.events,q); if(!sc.us.length&&!sc.opp.length) continue; h+=`<div><b>${q.length>1?q:'Q'+q}:</b> ${usN} ${sc.us.join(', ')||'—'} &nbsp;·&nbsp; ${opN} ${sc.opp.join(', ')||'—'}</div>`; } h+=`</div>`;
+  h+=`<div class="small" style="margin-top:8px">`; for(const q of QUARTERS){ const sc=scorersByQuarter(G.events,q); if(!sc.us.length&&!sc.opp.length) continue; h+=`<div><b>${qName(q)}:</b> ${usN} ${sc.us.join(', ')||'—'} &nbsp;·&nbsp; ${opN} ${sc.opp.join(', ')||'—'}</div>`; } h+=`</div>`;
   const exUs=exclusionsByCap(G.events,'us'); const outs=Object.entries(exUs).filter(([c,n])=>n>=3).map(([c])=>'#'+c);
   if(outs.length) h+=`<div class="flag" style="margin-top:6px">⚠ Fouled out (3 EXL): ${outs.join(', ')}</div>`;
   el('reconcile').innerHTML=h;
-  el('statsUsHdr').textContent=usN+' — '+(qf==='all'?'game':(qf.length>1?qf:'Q'+qf));
-  el('statsOppHdr').textContent=opN+' — '+(qf==='all'?'game':(qf.length>1?qf:'Q'+qf));
+  const ck=consistencyChecks(G.events,qf); const st=specialTeams(G.events,qf);
+  el('checks').innerHTML=ck.map(c=>`<div class="${c.ok?'ok':'no'}">${c.ok?'✓':'✗'} ${c.label} — ${c.a} / ${c.b}</div>`).join('')+
+    `<div>Man-up ${st.manUp.conv}/${st.manUp.opps} · Man-down killed ${st.manDown.killed}/${st.manDown.taken} · 5m: ${usN} ${st.pen.us.goals}/${st.pen.us.drawn} · ${opN} ${st.pen.opp.goals}/${st.pen.opp.drawn}</div><div class="small">Man-up = our goal within 25 s of their exclusion (app timestamps). The official timeline still rules.</div>`;
+  el('statsUsHdr').textContent=usN+' — '+(qf==='all'?'game':qName(qf));
+  el('statsOppHdr').textContent=opN+' — '+(qf==='all'?'game':qName(qf));
   const rows=computeStats(G.events,G.rosterUs,'us',qf), t=totals(rows);
   let u=`<tr><th>#</th><th class="l">Athlete</th><th>G</th><th>Shots</th><th>Att</th><th>A</th><th>Blk</th><th>Stl</th><th>TO</th><th>EXL Drn</th><th>5m Drn</th><th>EXL</th><th>P</th><th>Sprint</th></tr>`;
-  for(const r of rows) u+=`<tr><td><b>${r.cap}</b></td><td class="l">${r.name}</td><td>${r.goals||''}</td><td class="mono">${r.shots}</td><td>${r.att||''}</td><td>${r.assists||''}</td><td>${r.blocks||''}</td><td>${r.steals||''}</td><td>${r.to||''}</td><td>${r.exld||''}</td><td>${r.pend||''}</td><td class="${r.exl>=3?'flag':''}">${r.exl||''}</td><td>${r.pen||''}</td><td>${(r.sprintw||r.sprintl)?r.sprintw+'-'+r.sprintl:''}</td></tr>`;
+  for(const r of rows) u+=`<tr><td class="tap" data-team="us" data-cap="${r.cap}"><b>${r.cap}</b></td><td class="l">${r.name}</td><td>${r.goals||''}</td><td class="mono">${r.shots}</td><td>${r.att||''}</td><td>${r.assists||''}</td><td>${r.blocks||''}</td><td>${r.steals||''}</td><td>${r.to||''}</td><td>${r.exld||''}</td><td>${r.pend||''}</td><td class="${r.exl>=3?'flag':''}">${r.exl||''}</td><td>${r.pen||''}</td><td>${(r.sprintw||r.sprintl)?r.sprintw+'-'+r.sprintl:''}</td></tr>`;
   u+=`<tr class="tot"><td></td><td class="l">Total</td><td>${t.goals}</td><td></td><td>${t.att}</td><td>${t.assists}</td><td>${t.blocks}</td><td>${t.steals}</td><td>${t.to}</td><td>${t.exld}</td><td>${t.pend}</td><td>${t.exl}</td><td>${t.pen}</td><td>${t.sprintw}-${t.sprintl}</td></tr>`;
   el('tblUs').innerHTML=u;
   const ro=computeStats(G.events,G.rosterOpp,'opp',qf).filter(r=>r.n>0), to=totals(ro);
   let o=`<tr><th>#</th><th>G</th><th>Shots</th><th>Att</th><th>EXL Drn</th><th>5m Drn</th><th>EXL</th><th>P</th><th>Stl</th><th>TO</th></tr>`;
-  for(const r of ro) o+=`<tr><td><b>${r.cap}</b></td><td>${r.goals||''}</td><td class="mono">${r.shots}</td><td>${r.att||''}</td><td>${r.exld||''}</td><td>${r.pend||''}</td><td class="${r.exl>=3?'flag':''}">${r.exl||''}</td><td>${r.pen||''}</td><td>${r.steals||''}</td><td>${r.to||''}</td></tr>`;
+  for(const r of ro) o+=`<tr><td class="tap" data-team="opp" data-cap="${r.cap}"><b>${r.cap}</b></td><td>${r.goals||''}</td><td class="mono">${r.shots}</td><td>${r.att||''}</td><td>${r.exld||''}</td><td>${r.pend||''}</td><td class="${r.exl>=3?'flag':''}">${r.exl||''}</td><td>${r.pen||''}</td><td>${r.steals||''}</td><td>${r.to||''}</td></tr>`;
   o+=`<tr class="tot"><td>Total</td><td>${to.goals}</td><td></td><td>${to.att}</td><td>${to.exld}</td><td>${to.pend}</td><td>${to.exl}</td><td>${to.pen}</td><td>${to.steals}</td><td>${to.to}</td></tr>`;
   el('tblOpp').innerHTML=ro.length?o:'<tr><td class="small l">No opponent events yet.</td></tr>';
+}
+// Tap a cap in a stats table → that player's events for the filter, each editable.
+document.addEventListener('click',e=>{ const td=e.target.closest('#stats td.tap'); if(!td) return; openPlayer(td.dataset.team, td.dataset.cap); });
+function openPlayer(team,cap){
+  const render=()=>{ const ev=G.events.filter(e=>e.team===team&&String(e.cap)===String(cap)&&(qf==='all'||String(e.q)===String(qf)));
+    openSheet(`<h3>#${cap} ${team==='us'?usName():oppName()} <span class="small">${ev.length} events · ${qf==='all'?'game':qName(qf)}</span></h3><div class="lines">${ev.map(e=>`<div class="ev${e.edited?' edited':''}" data-id="${e.id}"><span class="m">${qName(e.q)}</span><span>${labelFor(L,e.team,e.action,e.cap)}</span><span class="m">${pairSuffix(G.events,e)}</span><span class="ed">${e.edited?'edited':'edit'}</span></div>`).join('')||'<div class="small">none</div>'}</div><div class="foot"><button class="ghost" id="plDone">Done</button></div>`);
+    el('sheet').querySelectorAll('.lines .ev').forEach(d=>d.addEventListener('click',()=>{ sheetAfter=()=>{ renderStats(); openPlayer(team,cap); }; openEdit(d.dataset.id); }));
+    el('plDone').addEventListener('click',()=>{ closeSheet(); renderStats(); }); };
+  render();
 }
 
 // ---- log ----
 function renderLog(){
   const box=el('logList'); box.innerHTML=''; if(!G.events.length){ box.innerHTML='<div class="small">No events yet.</div>'; return; }
-  [...G.events].reverse().forEach(e=>{ const d=document.createElement('div'); d.className='logrow';
-    const qs=`<select>${QUARTERS.map(q=>`<option value="${q}" ${String(e.q)===q?'selected':''}>${q.length>1?q:'Q'+q}</option>`).join('')}</select>`;
-    d.innerHTML=`<span class="q">${qs}</span><span class="t ${e.team}">${e.team==='us'?(G.us||'US'):(G.opp||'OPP')}</span><b>#${e.cap}</b><span>${actionName(e)}</span><span class="small">${new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span><button class="del">✕</button>`;
-    d.querySelector('select').addEventListener('change',ev=>{ e.q=ev.target.value; save(); renderScore(); });
-    d.querySelector('.del').addEventListener('click',()=>{ G.events=G.events.filter(x=>x.id!==e.id); save(); renderLog(); renderScore(); });
+  [...G.events].reverse().forEach(e=>{ const d=document.createElement('div'); d.className='logrow'+(e.edited?' edited':'')+(G.locked[e.q]?' lock':'');
+    d.innerHTML=`<span class="q">${qName(e.q)}</span><span class="t ${e.team}">${e.team==='us'?usName():oppName()}</span><b>#${e.cap}</b><span>${labelFor(L,e.team,e.action,e.cap)}</span><span class="pr">${pairSuffix(G.events,e)}${e.pair?' ↳':''}</span><span class="small">${new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span><span class="ed">${e.edited?'edited':(e.inserted?'inserted':'')}</span>`;
+    d.addEventListener('click',()=>{ sheetAfter=renderLog; openEdit(e.id); });
     box.appendChild(d); });
 }
 
+// ---- settings ----
+function renderSettings(){
+  el('lyUsHdr').textContent=usName().toUpperCase(); el('lyOppHdr').textContent=oppName().toUpperCase(); el('verOut').textContent=APP_VERSION;
+  el('optGoalBadge').checked=!!L.showGoalBadge; el('optSprint').checked=!!L.sprintPrompt; el('optCaps').value=L.defaultCaps;
+  const side=(s,boxId)=>{ const box=el(boxId); box.innerHTML=''; const list=sideButtons(L,s,true);
+    list.forEach((b,i)=>b.order=i+1);   // normalise 1..n
+    list.forEach((b,i)=>{ const d=document.createElement('div'); d.className='btnrow'+(b.enabled?'':' off');
+      const fuOpt = s==='us'&&ALLOWED_FOLLOWUP[b.key] ? `<label class="ck"><input type="checkbox" class="fu" ${b.followUp?'checked':''}> → ${FOLLOWUPS[ALLOWED_FOLLOWUP[b.key]].title.replace(/[:?].*$/,'')}</label>` : '';
+      d.innerHTML=`<span class="mv"><button class="up" ${i===0?'disabled':''}>▲</button><button class="dn" ${i===list.length-1?'disabled':''}>▼</button></span><span class="sw" style="background:${b.color}"></span><span class="key">${b.key}</span><input class="lbl" value="${b.label}" maxlength="24"><span class="swatches">${PALETTE.map(c=>`<button data-c="${c}" style="background:${c}" title="${c}"></button>`).join('')}<input type="color" class="col" value="${b.color}"></span><label class="ck"><input type="checkbox" class="en" ${b.enabled?'checked':''}> on</label><label class="ck"><input type="checkbox" class="w2" ${b.size==='2'?'checked':''}> wide</label>${fuOpt}`;
+      const re=()=>{ saveLayout(); renderSettings(); };
+      d.querySelector('.up').addEventListener('click',()=>{ const o=list[i-1]; b.order=i; o.order=i+1; re(); });
+      d.querySelector('.dn').addEventListener('click',()=>{ const o=list[i+1]; b.order=i+2; o.order=i+1; re(); });
+      d.querySelector('.lbl').addEventListener('change',ev=>{ b.label=ev.target.value.trim()||ACTION_DEFS[b.key].label; re(); });
+      d.querySelectorAll('.swatches button').forEach(x=>x.addEventListener('click',()=>{ b.color=x.dataset.c; re(); }));
+      d.querySelector('.col').addEventListener('change',ev=>{ b.color=ev.target.value; re(); });
+      d.querySelector('.en').addEventListener('change',ev=>{ b.enabled=ev.target.checked; re(); });
+      d.querySelector('.w2').addEventListener('change',ev=>{ b.size=ev.target.checked?'2':'1'; re(); });
+      const fu=d.querySelector('.fu'); if(fu) fu.addEventListener('change',ev=>{ b.followUp=ev.target.checked?ALLOWED_FOLLOWUP[b.key]:null; re(); });
+      box.appendChild(d); }); };
+  side('us','lyUs'); side('opp','lyOpp');
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  el('optGoalBadge').addEventListener('change',ev=>{ L.showGoalBadge=ev.target.checked; saveLayout(); });
+  el('optSprint').addEventListener('change',ev=>{ L.sprintPrompt=ev.target.checked; saveLayout(); });
+  el('optCaps').addEventListener('change',ev=>{ L.defaultCaps=ev.target.value; saveLayout(); });
+});
+window.resetLayout=()=>{ if(!confirm('Reset all buttons to the default layout?')) return; L=defaultLayout(); saveLayout(); renderSettings(); toast('Layout reset'); };
+window.exportLayout=()=>{ const blob=new Blob([JSON.stringify(Object.assign({layoutVersion:1, appVersion:APP_VERSION},L),null,1)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='wp-stat-tracker-layout.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500); };
+window.importLayout=inp=>{ const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); if(!Array.isArray(j.buttons)) throw 0; L=normalizeLayout(j); saveLayout(); renderSettings(); toast('Layout imported'); }catch(e){ toast('Not a layout file'); } }; r.readAsText(f); inp.value=''; };
+
 // ---- export ----
-function renderExport(){ el('mdOut').value=toMarkdown(G,G.events); }
+function renderExport(){ el('mdOut').value=toMarkdown(G,G.events,L); }
 window.copyMD=async()=>{ const t=el('mdOut').value; try{ await navigator.clipboard.writeText(t); toast('Markdown copied'); }catch(e){ el('mdOut').select(); document.execCommand('copy'); toast('Copied (select-all fallback)'); } };
 function fname(ext){ return `${G.date||'game'}_${(G.us||'us').replace(/\W+/g,'')}_vs_${(G.opp||'opp').replace(/\W+/g,'')}.${ext}`; }
-function blobFor(kind){ if(kind==='md') return new Blob([toMarkdown(G,G.events)],{type:'text/markdown'}); if(kind==='csv') return new Blob([toCSV(G,G.events)],{type:'text/csv'}); return new Blob([JSON.stringify(G,null,1)],{type:'application/json'}); }
+function exportObj(){ return Object.assign({}, G, {appVersion:APP_VERSION, layout:L}); }
+function blobFor(kind){ if(kind==='md') return new Blob([toMarkdown(G,G.events,L)],{type:'text/markdown'}); if(kind==='csv') return new Blob([toCSV(G,G.events)],{type:'text/csv'}); return new Blob([JSON.stringify(exportObj(),null,1)],{type:'application/json'}); }
 window.dl=kind=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(blobFor(kind)); a.download=fname(kind); document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500); };
 window.shareFiles=async(kind)=>{ try{ const mime=kind==='json'?'application/json':'text/markdown'; const files=[new File([blobFor(kind)],fname(kind),{type:mime})];
-  if(navigator.canShare&&navigator.canShare({files})) await navigator.share({files,title:fname(kind)}); else if(kind==='md') await navigator.share({title:fname('md'),text:toMarkdown(G,G.events)}); else throw 0; }catch(e){ if(e&&e.name==='AbortError') return; toast('Share not available — use Download'); } };
+  if(navigator.canShare&&navigator.canShare({files})) await navigator.share({files,title:fname(kind)}); else if(kind==='md') await navigator.share({title:fname('md'),text:toMarkdown(G,G.events,L)}); else throw 0; }catch(e){ if(e&&e.name==='AbortError') return; toast('Share not available — use Download'); } };
 window.restoreJSON=inp=>{ const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const g=JSON.parse(r.result);
-  if(Array.isArray(g.rosterUs) && !g.events){ G.rosterUs=g.rosterUs.map(p=>({cap:String(p.cap),name:p.name||''})); if(g.us) G.us=g.us; save(); bindHeader(); renderRoster('us'); toast('Roster imported'); return; }
-  if(!g.events||!g.rosterUs) throw 0; g.id=g.id||('g'+Date.now()); G=g; save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); renderAll(); toast('Restored'); }catch(e){ toast('Not a valid backup or roster file'); } }; r.readAsText(f); inp.value=''; };
-window.wipe=()=>{ if(!confirm('Delete this game from this device?')) return; delete store.games[G.id]; const rest=Object.values(store.games); G=rest.length?rest[0]:blankGame(); save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); renderAll(); show('setup'); };
+  if(Array.isArray(g.rosterUs) && !g.events){ G.rosterUs=g.rosterUs.map(p=>({cap:String(p.cap),name:p.name||''})); if(g.us) G.us=g.us; if(g.usShort) G.usShort=g.usShort; save(); bindHeader(); renderRoster('us'); toast('Roster imported'); return; }
+  if(!g.events||!g.rosterUs) throw 0; g.id=g.id||('g'+Date.now()); delete g.appVersion; delete g.layout; G=migrate(g); save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); renderAll(); toast('Restored'); }catch(e){ toast('Not a valid backup or roster file'); } }; r.readAsText(f); inp.value=''; };
+window.wipe=()=>{ if(!confirm('Delete this game from this device?')) return; delete store.games[G.id]; const rest=Object.values(store.games); G=rest.length?migrate(rest[0]):blankGame(); save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); renderAll(); show('setup'); };
 
 // ---- misc ----
 let tt; function toast(m){ const t=el('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),1400); }
 function renderAll(){ renderScore(); const v=document.querySelector('.view.on'); if(v) show(v.id); }
 document.addEventListener('DOMContentLoaded',()=>{
   safeLoad();
-  G = (store.current && store.games[store.current]) ? store.games[store.current] : blankGame();
-  if(!G.q) G.q='1'; save();
+  G = (store.current && store.games[store.current]) ? migrate(store.games[store.current]) : blankGame();
+  save();
   bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); renderScore();
 });
+// test hooks (no-ops in normal use)
+window.__wpst = { get G(){return G;}, set G(v){G=v;}, get L(){return L;}, save, renderAll, logEvent, tapQuarter, openEdit, selectCap:(t,c)=>selectCap(t,c), maybeSprint, resetTap:()=>{lastTap=0;} };
 })();
 </script>
 </body>
