@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="WP Stats">
 <meta name="theme-color" content="#0A1226">
+<link rel="manifest" href="manifest.webmanifest">
 <style>
   :root{
     --bg:#0A1226; --panel:#101C3A; --panel2:#15244A; --line:#2A3C66;
@@ -350,7 +351,7 @@
 
 <script>
 // ===LOGIC=== (pure functions; no DOM)
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 // Fixed action definitions — the KEY is the function; exports and the reconcile use keys, never labels.
 const ACTION_DEFS = {
   goal:   {label:'Goal',        shot:'1', family:'g'},
@@ -847,6 +848,8 @@ window.wipe=()=>{ if(!confirm('Delete this game from this device?')) return; del
 // ---- misc ----
 let tt; function toast(m){ const t=el('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),1400); }
 function renderAll(){ renderScore(); const v=document.querySelector('.view.on'); if(v) show(v.id); }
+// Offline: register the service worker so the app opens on a pool deck with no signal (v1.1.1, after Walnut Hills 2026-09-08).
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
 document.addEventListener('DOMContentLoaded',()=>{
   safeLoad();
   G = (store.current && store.games[store.current]) ? migrate(store.games[store.current]) : blankGame();
