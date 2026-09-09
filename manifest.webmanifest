@@ -1,0 +1,11 @@
+{
+ "name": "WP Stat Tracker",
+ "short_name": "WP Stats",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "any",
+ "background_color": "#0A1226",
+ "theme_color": "#0A1226",
+ "icons": []
+}
