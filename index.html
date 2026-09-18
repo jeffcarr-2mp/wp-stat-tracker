@@ -66,13 +66,23 @@
   .qbar button.on{background:var(--good); color:#0A1226}
   .qbar button.lock::after{content:'🔒'; position:absolute; top:2px; right:4px; font-size:10px}
   .qbar .undo{flex:none; background:#5a4a1c; padding:12px 16px}
-  .sel{background:var(--panel); border:1px dashed var(--line); border-radius:12px; padding:10px 12px; font-size:18px; font-weight:700; min-height:48px; display:flex; align-items:center; gap:10px}
-  .sel .who{font-size:24px}
-  .sel .clear{margin-left:auto; background:transparent; color:var(--mute); font-size:14px; padding:6px 10px}
+  #selBox{background:var(--panel); border:1px dashed var(--line); border-radius:12px; padding:10px 12px; font-size:18px; font-weight:700; min-height:48px; display:flex; align-items:center; gap:10px}
+  #selBox .who{font-size:24px}
+  #selBox .clear{margin-left:auto; background:transparent; color:var(--mute); font-size:14px; padding:6px 10px}
   .actions{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; flex:1; align-content:start}
   .act{height:72px; border-radius:14px; font-weight:800; font-size:19px; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.05; color:#fff}
   .act small{font-size:11px; font-weight:600; opacity:.8; margin-top:4px}
   .act.w2{grid-column:span 2}
+  .act.rare{outline:2px dashed #F2D27A; outline-offset:-5px}
+  #selBox.flash{border-style:solid; border-width:2px}
+  #selBox.flash.us{border-color:var(--usSel); background:#0B2A6B}
+  #selBox.flash.opp{border-color:var(--oppSel); background:#4A5055}
+  #selBox.flash .fb{font-size:20px; font-weight:800; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  #selBox.flash .fb .t{font-size:13px; letter-spacing:1px; padding:2px 8px; border-radius:8px; background:#0006}
+  #selBox.flash .fbtns{margin-left:auto; display:flex; gap:6px}
+  #selBox.flash .fbtn{background:#0007; color:#fff; font-weight:800; font-size:14px; padding:8px 12px; border-radius:10px}
+  .oppbar{display:none; align-items:center; justify-content:space-between; gap:8px; background:#6E7373; color:#fff; font-weight:800; border-radius:10px; padding:6px 10px; font-size:14px}
+  .oppbar button{background:var(--us); color:#fff; font-weight:800; padding:8px 12px; border-radius:10px}
   .qscore{display:flex; gap:6px}
   .qscore div{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; text-align:center; padding:6px 2px; font-size:13px}
   .qscore div b{display:block; font-size:16px}
@@ -172,12 +182,14 @@
     .qscore{order:2} .qscore div{padding:4px 2px; font-size:11px} .qscore div b{font-size:14px}
     .fouls{order:3; flex-direction:column; gap:4px; font-size:12px} .fouls > div{padding:4px 8px}
     .teamtoggle{display:flex; order:3}
+    #game.oppmode .oppbar{display:flex; order:3}
+    #game.oppmode .capcol{box-shadow:0 0 0 3px var(--oppSel) inset; border-radius:12px}
     .capcol{order:4; width:100%; flex:none; max-height:36vh; overflow:auto}
     .capcol .hdr{display:none}
     .capcol.hide{display:none}
     .capgrid{grid-template-columns:repeat(auto-fill,minmax(58px,1fr)); gap:5px}
     .cap{height:52px; font-size:19px; border-radius:10px} .cap small{font-size:9px}
-    .sel{order:5; font-size:15px; min-height:42px; padding:8px 10px} .sel .who{font-size:20px}
+    #selBox{order:5; font-size:15px; min-height:42px; padding:8px 10px} #selBox .who{font-size:20px}
     .actions{order:6; flex:none; gap:6px} .act{height:58px; font-size:15px; border-radius:11px} .act small{font-size:10px}
     .last3{order:7}
     .view{padding:8px} .roster{grid-template-columns:1fr} table{font-size:12px} th,td{padding:5px 5px}
@@ -189,7 +201,7 @@
     .tabs{padding-top:4px; padding-bottom:4px} .tabs button{padding:6px 10px}
     .capcol{width:150px} .cap{height:44px; font-size:17px} .cap small{display:none}
     .qbar button{padding:7px 0; font-size:15px} .qscore{display:none} .fouls{font-size:12px} .fouls > div{padding:3px 8px}
-    .act{height:48px; font-size:14px} .act small{display:none} .sel{min-height:36px; padding:6px 10px}
+    .act{height:48px; font-size:14px} .act small{display:none} #selBox{min-height:36px; padding:6px 10px}
     .last3 .ev{padding:3px 8px; font-size:12px}
   }
 </style>
@@ -272,6 +284,7 @@
     </div>
     <div class="qscore" id="qscore"></div>
     <div class="fouls" id="fouls"></div>
+    <div class="oppbar" id="oppBar"><span id="oppBarTxt"></span><button onclick="backToUs()" id="oppBack">← back</button></div>
     <div class="sel" id="selBox"><span class="small">Tap a cap number, then an action.</span></div>
     <div class="actions" id="actions"></div>
     <div class="last3" id="last3"></div>
@@ -340,6 +353,8 @@
     <div class="row">
       <label class="ck" style="flex-direction:row; align-items:center"><input type="checkbox" id="optGoalBadge"> Goal count badge on caps</label>
       <label class="ck" style="flex-direction:row; align-items:center"><input type="checkbox" id="optSprint"> Sprint prompt at each quarter start</label>
+      <label class="ck" style="flex-direction:row; align-items:center"><input type="checkbox" id="optOppReturn"> Phone: return to our side after each opponent event</label>
+      <label class="ck" style="flex-direction:row; align-items:center"><input type="checkbox" id="optGuards"> Guards: confirm opponent 5m Goal / Penalty, and ask on a second goal within 15 s</label>
       <label>Default cap colour<select id="optCaps"><option value="dark">Dark</option><option value="white">White</option></select></label>
     </div>
     <div class="small" style="margin-top:8px">Layout and options are stored on this device separately from games (<code>wpst_layout_v1</code>). App v<span id="verOut"></span>.</div>
@@ -351,7 +366,7 @@
 
 <script>
 // ===LOGIC=== (pure functions; no DOM)
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 // Fixed action definitions — the KEY is the function; exports and the reconcile use keys, never labels.
 const ACTION_DEFS = {
   goal:   {label:'Goal',        shot:'1', family:'g'},
@@ -378,13 +393,25 @@ const FOLLOWUPS = {
   drawnBy:{title:'Drawn by opponent cap?',   side:'opp', logs:'exld',   logTeam:'opp'},
 };
 const ALLOWED_FOLLOWUP = {goal:'assist', pgoal:'assist', exld:'oppExcl', pend:'oppPen', exl:'drawnBy'};
+const LAYOUT_V = 2;
+const OPP_ORDER_V1 = ['goal','pgoal','miss','exl','pen','to','steal'];
+const OPP_ORDER_V2 = ['goal','miss','exl','to','steal','pgoal','pen'];
+const DUP_GOAL_MS = 15000;
+// Opponent 5m Goal / Penalty are rare and were logged for their neighbours (Ohio Cup). They ask once; the alternative is one tap.
+const CONFIRM_ALT = {pgoal:'goal', pen:'exl'};
+function needsConfirm(team,key){ return team==='opp' && !!CONFIRM_ALT[key]; }
+// The last goal by this team in this quarter, if it was logged less than windowMs ago. A second one that soon is almost always a re-entry.
+function recentSameTeamGoal(events, team, q, nowMs, windowMs){
+  for(let i=events.length-1;i>=0;i--){ const e=events[i]; if(e.team===team && String(e.q)===String(q) && isGoal(e)){ const dt=nowMs-Date.parse(e.ts); return (dt>=0 && dt<(windowMs||DUP_GOAL_MS))?e:null; } }
+  return null;
+}
 function defaultLayout(){
   const us  = [['goal','assist'],['pgoal','assist'],['miss',null],['assist',null],['block',null],['steal',null],['to',null],['exld','oppExcl'],['pend','oppPen'],['exl',null],['pen',null],['sprintw',null],['sprintl',null]];
-  const opp = ['goal','pgoal','miss','exl','pen','to','steal'];
+  const opp = OPP_ORDER_V2;   // v1.2: the two rare keys (5m Goal, Penalty) sit last, away from Goal and Exclusion
   const mk=(key,side,order,fu)=>({key, label:ACTION_DEFS[key].label, color:FAMILY_COLOR[ACTION_DEFS[key].family], side, order, enabled:true, followUp:fu||null, size:'1'});
   return {
     buttons: us.map(([k,fu],i)=>mk(k,'us',i+1,fu)).concat(opp.map((k,i)=>mk(k,'opp',i+1,null))),
-    showGoalBadge:false, sprintPrompt:true, defaultCaps:'dark'
+    showGoalBadge:false, sprintPrompt:true, defaultCaps:'dark', oppAutoReturn:true, guards:true, v:LAYOUT_V
   };
 }
 // Sanitise an imported/stored layout against the fixed keys.
@@ -397,7 +424,10 @@ function normalizeLayout(raw){
     out.push({key:b.key, label:String(b.label||ACTION_DEFS[b.key].label).slice(0,24), color:/^#[0-9a-fA-F]{6}$/.test(b.color||'')?b.color:FAMILY_COLOR[ACTION_DEFS[b.key].family], side:b.side, order:Number(b.order)||out.length+1, enabled:b.enabled!==false, followUp:fu, size:String(b.size)==='2'?'2':'1'}); }
   // any default button missing from the import is appended, disabled
   for(const b of d.buttons){ const id=b.side+':'+b.key; if(!seen.has(id)){ out.push(Object.assign({},b,{enabled:false, order:999})); } }
-  return {buttons:out, showGoalBadge:!!raw.showGoalBadge, sprintPrompt:raw.sprintPrompt!==false, defaultCaps:raw.defaultCaps==='white'?'white':'dark'};
+  // v1 → v2: if the opponent side still has the untouched v1 order, move it to the v2 order. A customised order is left alone. Labels, colours, sizes and enabled flags are kept either way.
+  if((Number(raw.v)||1)<2){ const oppB=out.filter(b=>b.side==='opp').sort((a,b)=>a.order-b.order); const en=oppB.filter(b=>b.enabled).map(b=>b.key);
+    if(en.length===OPP_ORDER_V1.length && en.every((k,i)=>k===OPP_ORDER_V1[i])) oppB.forEach(b=>{ b.order=OPP_ORDER_V2.indexOf(b.key)+1; }); }
+  return {buttons:out, showGoalBadge:!!raw.showGoalBadge, sprintPrompt:raw.sprintPrompt!==false, defaultCaps:raw.defaultCaps==='white'?'white':'dark', oppAutoReturn:raw.oppAutoReturn!==false, guards:raw.guards!==false, v:LAYOUT_V};
 }
 function sideButtons(layout, side, includeDisabled){ return layout.buttons.filter(b=>b.side===side&&(includeDisabled||b.enabled)).sort((a,b)=>a.order-b.order); }
 function labelFor(layout, team, key, cap){
@@ -551,7 +581,7 @@ function applyEdit(e, changes){
 }
 // ===END LOGIC===
 
-if (typeof module!=='undefined') module.exports = {APP_VERSION,ACTION_DEFS,FOLLOWUPS,ALLOWED_FOLLOWUP,defaultLayout,normalizeLayout,sideButtons,labelFor,isGoalieCap,computeStats,totals,scoreByQuarter,scorersByQuarter,exclusionsByCap,goalsByCap,pairedOf,pairSuffix,specialTeams,consistencyChecks,toMarkdown,toCSV,applyEdit,QUARTERS};
+if (typeof module!=='undefined') module.exports = {APP_VERSION,ACTION_DEFS,FOLLOWUPS,ALLOWED_FOLLOWUP,defaultLayout,normalizeLayout,sideButtons,labelFor,isGoalieCap,computeStats,totals,scoreByQuarter,scorersByQuarter,exclusionsByCap,goalsByCap,pairedOf,pairSuffix,specialTeams,consistencyChecks,toMarkdown,toCSV,applyEdit,QUARTERS,needsConfirm,recentSameTeamGoal,CONFIRM_ALT,OPP_ORDER_V1,OPP_ORDER_V2,LAYOUT_V,DUP_GOAL_MS};
 if (typeof document!=='undefined') (function(){
 // ===UI===
 // Caps only — no names in the public file. Import roster-*.json (kept private) to load names once; they persist on-device.
@@ -562,8 +592,10 @@ let L = defaultLayout();
 let G = null;              // current game {id,date,us,usShort,opp,loc,ha,lvl,caps,rosterUs,rosterOpp,events,q,locked,sprintAsked}
 let selected = null;       // {team,cap}
 let lastTap = 0;
+let flash = null, flashT = null;   // {id} of the event shown in the confirmation banner
+const FLASH_MS = 6000;
 
-function safeLoad(){ try{ const s=localStorage.getItem(KEY); if(s) store=JSON.parse(s); }catch(e){} try{ const l=localStorage.getItem(LKEY); L=normalizeLayout(l?JSON.parse(l):null); }catch(e){ L=defaultLayout(); } }
+function safeLoad(){ try{ const s=localStorage.getItem(KEY); if(s) store=JSON.parse(s); }catch(e){} try{ const l=localStorage.getItem(LKEY); L=normalizeLayout(l?JSON.parse(l):null); if(l) saveLayout(); }catch(e){ L=defaultLayout(); } }
 function save(){ try{ if(G){ store.games[G.id]=G; store.current=G.id; store.roster=G.rosterUs; store.usShort=G.usShort||''; store.us=G.us; } localStorage.setItem(KEY, JSON.stringify(store)); el('saveState').textContent='saved '+new Date().toLocaleTimeString(); }catch(e){ el('saveState').textContent='⚠ not saved (storage unavailable) — use Backup .json'; } }
 function saveLayout(){ try{ localStorage.setItem(LKEY, JSON.stringify(L)); }catch(e){} }
 function el(id){ return document.getElementById(id); }
@@ -601,10 +633,12 @@ function show(v){ document.querySelectorAll('.tabs button[data-v]').forEach(b=>b
 document.addEventListener('click',e=>{ const b=e.target.closest('.tabs button[data-v]'); if(b) show(b.dataset.v); });
 let phoneTeam='us';
 document.addEventListener('click',e=>{ const b=e.target.closest('.teamtoggle button[data-t]'); if(b){ phoneTeam=b.dataset.t; selected=null; renderGame(); } });
+window.backToUs=()=>{ phoneTeam='us'; selected=null; renderGame(); };
 function renderGame(){
   el('hdrUs').textContent=usName().toUpperCase(); el('hdrOpp').textContent=oppName().toUpperCase();
   document.querySelectorAll('.teamtoggle button[data-t]').forEach(b=>{ b.classList.toggle('on',b.dataset.t===phoneTeam); b.textContent=(b.dataset.t==='us'?usName():oppName()).toUpperCase(); });
   el('colUs').classList.toggle('hide',phoneTeam!=='us'); el('colOpp').classList.toggle('hide',phoneTeam!=='opp');
+  el('game').classList.toggle('oppmode',phoneTeam==='opp'); el('oppBarTxt').textContent='Logging for '+oppName().toUpperCase(); el('oppBack').textContent='← '+usName().toUpperCase();
   document.querySelectorAll('.qbar button[data-q]').forEach(b=>{ b.classList.toggle('on',b.dataset.q===String(G.q)); b.classList.toggle('lock',!!G.locked[b.dataset.q]); });
   const exUs=exclusionsByCap(G.events,'us'), exOpp=exclusionsByCap(G.events,'opp'); const glUs=goalsByCap(G.events,'us'), glOpp=goalsByCap(G.events,'opp');
   const mk=(team,list,ex,gl)=>{ const box=el(team==='us'?'capsUs':'capsOpp'); box.innerHTML='';
@@ -634,25 +668,65 @@ function selectCap(team,cap){ selected=(selected&&selected.team===team&&selected
 window.clearSel=()=>{ selected=null; renderGame(); };
 function actBtn(b, cap, onClick){ const x=document.createElement('button'); x.className='act'+(b.size==='2'?' w2':''); x.style.background=b.color; const def=ACTION_DEFS[b.key]; const lbl=(b.key==='block'&&isGoalieCap(cap))?'Save':b.label; x.innerHTML=lbl+(def.sub?`<small>${def.sub}</small>`:''); x.dataset.k=b.key; x.addEventListener('click',onClick); return x; }
 function renderActions(){
-  const box=el('actions'); box.innerHTML=''; const sb=el('selBox');
+  const box=el('actions'); box.innerHTML=''; const sb=el('selBox'); sb.className='sel';
   if(G.locked[G.q]){ sb.innerHTML=`<span class="small">${qName(G.q)} is locked. Tap ${qName(G.q)} above to review or unlock.</span>`; return; }
-  if(!selected){ sb.innerHTML='<span class="small">Tap a cap number, then an action.</span>'; return; }
+  if(!selected){ if(!renderFlash(sb)) sb.innerHTML='<span class="small">Tap a cap number, then an action.</span>'; return; }
   const list=selected.team==='us'?G.rosterUs:G.rosterOpp; const p=list.find(x=>x.cap===selected.cap)||{};
   sb.innerHTML=`<span class="who" style="color:${selected.team==='us'?'var(--usSel)':'var(--oppSel)'}">#${selected.cap}</span> ${p.name||(selected.team==='us'?usName():oppName())} <span class="small">· ${qName(G.q)}</span><button class="clear" onclick="clearSel()">clear</button>`;
-  sideButtons(L,selected.team).forEach(b=>box.appendChild(actBtn(b,selected.cap,()=>logEvent(b.key))));
+  sideButtons(L,selected.team).forEach(b=>{ const x=actBtn(b,selected.cap,()=>logEvent(b.key)); if(L.guards&&needsConfirm(selected.team,b.key)) x.classList.add('rare'); box.appendChild(x); });
+}
+// Confirmation banner (v1.2): what was just logged, for which TEAM, with one-tap Undo and one-tap move to the other team.
+function canSwap(e){ if(e.pair||pairedOf(G.events,e).length) return false; const other=e.team==='us'?'opp':'us'; return sideButtons(L,other).some(b=>b.key===e.action); }
+function renderFlash(sb){
+  if(!flash) return false; const e=G.events.find(x=>x.id===flash.id); if(!e){ flash=null; return false; }
+  const other=e.team==='us'?'opp':'us'; const otherName=(other==='us'?usName():oppName()).toUpperCase();
+  sb.className='sel flash '+e.team;
+  sb.innerHTML=`<span class="fb"><span class="t">${(e.team==='us'?usName():oppName()).toUpperCase()}</span>#${e.cap} ${labelFor(L,e.team,e.action,e.cap)}<span class="small">${qName(e.q)}${isGoal(e)?' · '+score():''}</span></span><span class="fbtns"><button class="fbtn" id="fbUndo">Undo</button>${canSwap(e)?`<button class="fbtn" id="fbSwap">→ ${otherName}</button>`:''}</span>`;
+  el('fbUndo').addEventListener('click',()=>{ const ids=new Set([e.id,...pairedOf(G.events,e).map(p=>p.id)]); G.events=G.events.filter(x=>!ids.has(x.id)); flash=null; save(); toast(`Undid: #${e.cap} ${labelFor(L,e.team,e.action,e.cap)}`); renderGame(); });
+  const sw=el('fbSwap'); if(sw) sw.addEventListener('click',()=>openSwap(e));
+  return true;
+}
+function setFlash(id){ flash={id}; clearTimeout(flashT); flashT=setTimeout(()=>{ flash=null; if(el('game').classList.contains('on')&&!selected) renderActions(); },FLASH_MS); }
+// Logged for the wrong team: move the event across in one step (one event, marked edited) instead of fixing one side and forgetting the other.
+function openSwap(e){
+  const other=e.team==='us'?'opp':'us'; const roster=other==='us'?G.rosterUs:G.rosterOpp; const name=other==='us'?usName():oppName();
+  openSheet(`<h3>Move to ${name} <span class="small">was ${e.team==='us'?usName():oppName()} #${e.cap} ${labelFor(L,e.team,e.action,e.cap)}</span></h3><div class="sec">Which ${name} cap?</div>${capGridHtml(other,roster,null,'sw')}<div class="foot"><button class="ghost" id="swCancel">Cancel</button></div>`);
+  el('sheet').querySelectorAll('.cap.sw').forEach(b=>b.addEventListener('click',()=>{ applyEdit(e,{team:other,cap:b.dataset.cap}); save(); setFlash(e.id); closeSheet(); renderGame();
+    const btn=L.buttons.find(x=>x.side===e.team&&x.key===e.action); if(btn&&btn.followUp&&FOLLOWUPS[btn.followUp]) openFollowUp(e,btn.followUp); }));
+  el('swCancel').addEventListener('click',closeSheet);
+}
+function openConfirmRare(team,cap,k,opts){
+  const alt=CONFIRM_ALT[k]; const nm=(team==='us'?usName():oppName());
+  openSheet(`<h3>${nm} #${cap} — ${labelFor(L,team,k,cap)}? <span class="small">${qName(G.q)} · rare on this side</span></h3>
+    <div class="foot"><button class="primary" id="crYes">Yes — ${labelFor(L,team,k,cap)}</button><button class="sp" id="crAlt">No — ${labelFor(L,team,alt,cap)}</button><button class="ghost" id="crCancel">Cancel</button></div>`);
+  const go=key=>{ closeSheet(); logEvent(key,Object.assign({},opts,{confirmed:true,skipTap:true})); };
+  el('crYes').addEventListener('click',()=>go(k)); el('crAlt').addEventListener('click',()=>go(alt)); el('crCancel').addEventListener('click',closeSheet);
+}
+function openDupGuard(team,cap,k,prev,opts){
+  const nm=(team==='us'?usName():oppName()); const secs=Math.max(1,Math.round((Date.now()-Date.parse(prev.ts))/1000)); const s=scoreByQuarter(G.events).total; const nu=s.us+(team==='us'?1:0), no=s.opp+(team==='opp'?1:0);
+  openSheet(`<h3>Second ${nm} goal in ${secs} s? <span class="small">last: #${prev.cap} ${labelFor(L,prev.team,prev.action,prev.cap)} · now ${s.us}–${s.opp}</span></h3>
+    <div class="foot"><button class="primary" id="dgYes">Yes — log #${cap}, makes it ${nu}–${no}</button><button class="sp" id="dgNo">No — already logged</button></div>`);
+  el('dgYes').addEventListener('click',()=>{ closeSheet(); logEvent(k,Object.assign({},opts,{dupOk:true,skipTap:true})); });
+  el('dgNo').addEventListener('click',()=>{ selected=null; setFlash(prev.id); closeSheet(); renderGame(); });
 }
 function newEvent(q,team,cap,action,extra){ return Object.assign({id:'e'+Date.now()+Math.random().toString(36).slice(2,6), q, team, cap, action, ts:new Date().toISOString()}, extra||{}); }
-function logEvent(k){
-  const now=Date.now(); if(now-lastTap<250) return; lastTap=now;
+function logEvent(k, opts){
+  opts=opts||{};
+  if(!opts.skipTap){ const now=Date.now(); if(now-lastTap<250) return; lastTap=now; }
   if(!selected) return;
   if(G.locked[G.q]){ toast(`${qName(G.q)} is locked — unlock in the quarter review`); return; }
-  const e=newEvent(G.q,selected.team,selected.cap,k);
+  const team=selected.team, cap=selected.cap;
+  if(L.guards && !opts.confirmed && needsConfirm(team,k)){ openConfirmRare(team,cap,k,opts); return; }
+  if(L.guards && !opts.dupOk && (k==='goal'||k==='pgoal')){ const prev=recentSameTeamGoal(G.events,team,G.q,Date.now(),DUP_GOAL_MS); if(prev){ openDupGuard(team,cap,k,prev,opts); return; } }
+  const e=newEvent(G.q,team,cap,k);
   G.events.push(e); save();
   const b=L.buttons.find(x=>x.side===e.team&&x.key===k);
-  selected=null; renderGame();
+  selected=null; setFlash(e.id);
+  if(team==='opp' && phoneTeam==='opp' && L.oppAutoReturn) phoneTeam='us';   // the sticky opponent screen was the main source of wrong-team events
+  renderGame();
   if(b&&b.followUp&&FOLLOWUPS[b.followUp]) openFollowUp(e,b.followUp);
 }
-window.undo=()=>{ const e=G.events.pop(); if(!e){toast('Nothing to undo');return;} save(); toast(`Undid: #${e.cap} ${labelFor(L,e.team,e.action,e.cap)}`); renderGame(); };
+window.undo=()=>{ const e=G.events.pop(); if(!e){toast('Nothing to undo');return;} flash=null; save(); toast(`Undid: #${e.cap} ${labelFor(L,e.team,e.action,e.cap)}`); renderGame(); };
 document.addEventListener('click',e=>{ const b=e.target.closest('.qbar button[data-q]'); if(b) tapQuarter(b.dataset.q); });
 function tapQuarter(q){
   if(q===String(G.q)){ openBreak(q, null); return; }              // review current quarter mid-way
@@ -804,7 +878,7 @@ function renderLog(){
 // ---- settings ----
 function renderSettings(){
   el('lyUsHdr').textContent=usName().toUpperCase(); el('lyOppHdr').textContent=oppName().toUpperCase(); el('verOut').textContent=APP_VERSION;
-  el('optGoalBadge').checked=!!L.showGoalBadge; el('optSprint').checked=!!L.sprintPrompt; el('optCaps').value=L.defaultCaps;
+  el('optGoalBadge').checked=!!L.showGoalBadge; el('optSprint').checked=!!L.sprintPrompt; el('optCaps').value=L.defaultCaps; el('optOppReturn').checked=!!L.oppAutoReturn; el('optGuards').checked=!!L.guards;
   const side=(s,boxId)=>{ const box=el(boxId); box.innerHTML=''; const list=sideButtons(L,s,true);
     list.forEach((b,i)=>b.order=i+1);   // normalise 1..n
     list.forEach((b,i)=>{ const d=document.createElement('div'); d.className='btnrow'+(b.enabled?'':' off');
@@ -825,10 +899,12 @@ function renderSettings(){
 document.addEventListener('DOMContentLoaded',()=>{
   el('optGoalBadge').addEventListener('change',ev=>{ L.showGoalBadge=ev.target.checked; saveLayout(); });
   el('optSprint').addEventListener('change',ev=>{ L.sprintPrompt=ev.target.checked; saveLayout(); });
+  el('optOppReturn').addEventListener('change',ev=>{ L.oppAutoReturn=ev.target.checked; saveLayout(); });
+  el('optGuards').addEventListener('change',ev=>{ L.guards=ev.target.checked; saveLayout(); });
   el('optCaps').addEventListener('change',ev=>{ L.defaultCaps=ev.target.value; saveLayout(); });
 });
 window.resetLayout=()=>{ if(!confirm('Reset all buttons to the default layout?')) return; L=defaultLayout(); saveLayout(); renderSettings(); toast('Layout reset'); };
-window.exportLayout=()=>{ const blob=new Blob([JSON.stringify(Object.assign({layoutVersion:1, appVersion:APP_VERSION},L),null,1)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='wp-stat-tracker-layout.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500); };
+window.exportLayout=()=>{ const blob=new Blob([JSON.stringify(Object.assign({layoutVersion:LAYOUT_V, appVersion:APP_VERSION},L),null,1)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='wp-stat-tracker-layout.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500); };
 window.importLayout=inp=>{ const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); if(!Array.isArray(j.buttons)) throw 0; L=normalizeLayout(j); saveLayout(); renderSettings(); toast('Layout imported'); }catch(e){ toast('Not a layout file'); } }; r.readAsText(f); inp.value=''; };
 
 // ---- export ----
@@ -857,7 +933,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); renderScore();
 });
 // test hooks (no-ops in normal use)
-window.__wpst = { get G(){return G;}, set G(v){G=v;}, get L(){return L;}, save, renderAll, logEvent, tapQuarter, openEdit, selectCap:(t,c)=>selectCap(t,c), maybeSprint, resetTap:()=>{lastTap=0;} };
+window.__wpst = { get G(){return G;}, set G(v){G=v;}, get L(){return L;}, save, renderAll, logEvent, tapQuarter, openEdit, selectCap:(t,c)=>selectCap(t,c), maybeSprint, resetTap:()=>{lastTap=0;}, get phoneTeam(){return phoneTeam;}, setPhoneTeam:t=>{phoneTeam=t; selected=null; renderGame();}, get flash(){return flash;} };
 })();
 </script>
 </body>
