@@ -253,7 +253,7 @@
     <div class="roster" id="rosterOpp"></div>
     <div class="row" style="margin-top:10px">
       <button onclick="addPlayer('opp')">+ Add cap</button>
-      <button onclick="genOpp()">Generate caps 1–15</button>
+      <button onclick="genOpp()">Generate caps 1–30</button>
       <button onclick="sortRoster('opp')">Sort by cap</button>
       <button class="danger" onclick="clearRoster('opp')">Clear</button>
     </div>
@@ -366,7 +366,7 @@
 
 <script>
 // ===LOGIC=== (pure functions; no DOM)
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 // Fixed action definitions — the KEY is the function; exports and the reconcile use keys, never labels.
 const ACTION_DEFS = {
   goal:   {label:'Goal',        shot:'1', family:'g'},
@@ -603,7 +603,7 @@ function today(){ const d=new Date(); return d.toISOString().slice(0,10); }
 function migrate(g){ if(!g.q) g.q='1'; if(!g.locked) g.locked={}; if(!g.sprintAsked) g.sprintAsked={}; if(!g.caps) g.caps=L.defaultCaps; if(g.usShort===undefined) g.usShort=store.usShort||''; return g; }
 function blankGame(){ return migrate({id:'g'+Date.now(), date:today(), us:store.us||'St. Xavier', usShort:store.usShort||'', opp:'', loc:'', ha:'Home', lvl:'Varsity', caps:L.defaultCaps,
   rosterUs: (store.roster && store.roster.length) ? JSON.parse(JSON.stringify(store.roster)) : JSON.parse(JSON.stringify(DEFAULT_ROSTER)),
-  rosterOpp: Array.from({length:15},(_,i)=>({cap:String(i+1),name:''})), events:[], q:'1'}); }
+  rosterOpp: Array.from({length:30},(_,i)=>({cap:String(i+1),name:''})), events:[], q:'1'}); }
 const usName = () => G.usShort || G.us || 'US';
 const oppName = () => G.opp || 'OPP';
 
@@ -620,7 +620,7 @@ function renderRoster(team){
 window.addPlayer = t => { (t==='us'?G.rosterUs:G.rosterOpp).push({cap:'',name:''}); renderRoster(t); };
 window.loadDefaultRoster = () => { G.rosterUs=JSON.parse(JSON.stringify(DEFAULT_ROSTER)); save(); renderRoster('us'); };
 window.rosterFromLast = () => { const others=Object.values(store.games).filter(g=>g.id!==G.id).sort((a,b)=>(b.date||'').localeCompare(a.date||'')); const src=others[0]?others[0].rosterUs:store.roster; if(!src||!src.length){ toast('No previous roster on this device'); return; } G.rosterUs=JSON.parse(JSON.stringify(src)); save(); renderRoster('us'); toast(others[0]?`Roster from ${others[0].date} vs ${others[0].opp||'?'}`:'Roster restored'); };
-window.genOpp = () => { G.rosterOpp=Array.from({length:15},(_,i)=>({cap:String(i+1),name:''})); save(); renderRoster('opp'); };
+window.genOpp = () => { G.rosterOpp=Array.from({length:30},(_,i)=>({cap:String(i+1),name:''})); save(); renderRoster('opp'); };
 window.clearRoster = t => { if(!confirm('Clear opponent caps?')) return; G.rosterOpp=[]; save(); renderRoster('opp'); };
 window.sortRoster = t => { (t==='us'?G.rosterUs:G.rosterOpp).sort((a,b)=>capSort(a.cap,b.cap)); save(); renderRoster(t); };
 window.newGame = () => { if(G && G.events.length && !confirm('Start a new game? Current game stays saved in the list.')) return; store.roster=G?G.rosterUs:store.roster; G=blankGame(); save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); toast('New game'); };
