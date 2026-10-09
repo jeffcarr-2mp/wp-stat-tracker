@@ -87,6 +87,9 @@
   .qscore div{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; text-align:center; padding:6px 2px; font-size:13px}
   .qscore div b{display:block; font-size:16px}
   .qscore div.on{border-color:var(--usSel)}
+  .qscore div.chip{cursor:pointer; flex:0 0 auto; min-width:52px; padding:6px 8px} .qscore div.chip b{color:var(--usSel)} .qscore div.chip.off{opacity:.45} .qscore div.chip.off b{color:var(--mute)}
+  .gkline{font-size:13px; margin:6px 0 2px} .gkline b.t{font-size:11px; letter-spacing:.5px; color:var(--usSel); margin-right:6px} .gkline .seg{cursor:pointer; text-decoration:underline dotted var(--mute)}
+  #deleted{margin-top:12px} #deleted summary{cursor:pointer; padding:6px 4px} .logrow.delrow{opacity:.7; cursor:default} .logrow.delrow .restore{padding:6px 10px}
   .fouls{display:flex; gap:8px; font-size:13px; line-height:1.35}
   .fouls > div{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:6px 10px; min-width:0}
   .fouls b.t{font-size:11px; letter-spacing:.5px; text-transform:uppercase; margin-right:6px}
@@ -226,9 +229,9 @@
     <div class="row">
       <label>Date<input type="date" id="gDate"></label>
       <label>Our team<input id="gUs" placeholder="St. Xavier" style="width:150px"></label>
-      <label>Short name<input id="gUsShort" placeholder="ST X" style="width:90px"></label>
+      <label>Short name<input id="gUsShort" placeholder="ST X" style="width:90px" maxlength="10"></label>
       <label>Opponent<input id="gOpp" placeholder="Hudsonville" style="width:170px"></label>
-      <label>Location<input id="gLoc" placeholder="Upper Arlington" style="width:170px"></label>
+      <label>Location<input id="gLoc" placeholder="Upper Arlington" style="width:170px" maxlength="20"></label>
       <label>Home/Away<select id="gHA"><option>Home</option><option>Away</option><option>Neutral</option></select></label>
       <label>Level<select id="gLvl"><option>Varsity</option><option>JV</option><option>Club</option></select></label>
       <label>Our caps<select id="gCaps"><option value="dark">Dark</option><option value="white">White</option></select></label>
@@ -325,7 +328,9 @@
       <button onclick="shareFiles('json')">Share backup .json…</button>
       <button onclick="dl('json')">Download backup .json</button>
       <label class="small">Restore .json <input type="file" id="restore" accept=".json" onchange="restoreJSON(this)"></label>
+      <button class="primary" id="syncBtn" onclick="syncNow()">Sync ↑</button>
     </div>
+    <div class="small" id="exInfo" style="margin-bottom:8px"></div>
     <textarea class="md" id="mdOut" readonly></textarea>
   </div>
   <div class="card">
@@ -357,7 +362,15 @@
       <label class="ck" style="flex-direction:row; align-items:center"><input type="checkbox" id="optGuards"> Guards: confirm opponent 5m Goal / Penalty, and ask on a second goal within 15 s</label>
       <label>Default cap colour<select id="optCaps"><option value="dark">Dark</option><option value="white">White</option></select></label>
     </div>
-    <div class="small" style="margin-top:8px">Layout and options are stored on this device separately from games (<code>wpst_layout_v1</code>). App v<span id="verOut"></span>.</div>
+    <div class="small" style="margin-top:8px">Layout and options are stored on this device separately from games (<code>wpst_layout_v1</code>). App v<span id="verOut"></span>. <span id="syncOrigin"></span></div>
+  </div>
+  <div class="card">
+    <h2>Server <span class="small">— where Sync posts this phone's export. Stored on this device only (<code>wpst_sync</code>); never in an export or a backup.</span></h2>
+    <div class="row">
+      <label>Server URL <span class="small">(blank = this page's own origin)</span><input id="syncServer" placeholder="https://…" style="width:260px" autocapitalize="off" autocomplete="off"></label>
+      <label>Device token<span style="display:flex;gap:6px"><input id="syncToken" type="password" style="width:220px" autocapitalize="off" autocomplete="off"><button class="ghost" id="syncShow" type="button">show</button></span></label>
+    </div>
+    <div class="small" style="margin-top:6px">Staff issue the token per device. Sync is manual: tap <b>Sync</b> on the Export tab or the game screen; nothing posts on its own.</div>
   </div>
 </div>
 
@@ -366,8 +379,11 @@
 
 <script>
 // ===LOGIC=== (pure functions; no DOM)
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.3';
 // Fixed action definitions — the KEY is the function; exports and the reconcile use keys, never labels.
+// v1.2.3: `gk` ("this cap is now in goal") is an event key but NOT a button - it is logged by the GK chip, the Q1 prompt and the
+// save guard, never from the action grid, so it is not in ACTION_DEFS and no layout can carry it (normalizeLayout drops unknown keys).
+const GK_DEF = {label:'In goal', family:'d', sub:'goalie change'};
 const ACTION_DEFS = {
   goal:   {label:'Goal',        shot:'1', family:'g'},
   pgoal:  {label:'5m Goal',     shot:'5', family:'g'},
@@ -431,6 +447,7 @@ function normalizeLayout(raw){
 }
 function sideButtons(layout, side, includeDisabled){ return layout.buttons.filter(b=>b.side===side&&(includeDisabled||b.enabled)).sort((a,b)=>a.order-b.order); }
 function labelFor(layout, team, key, cap){
+  if(key==='gk') return GK_DEF.label;
   if(key==='block' && isGoalieCap(cap)) return 'Save';
   const b = layout && layout.buttons.find(x=>x.side===team&&x.key===key); return b?b.label:(ACTION_DEFS[key]?ACTION_DEFS[key].label:key);
 }
@@ -450,7 +467,7 @@ function capSort(a,b){
 
 // Per-player stat lines for one team, optionally filtered to a quarter.
 function computeStats(events, roster, team, q){
-  const ev = events.filter(e => e.team===team && (q==='all' || String(e.q)===String(q)));
+  const ev = events.filter(e => e.team===team && e.action!=='gk' && (q==='all' || String(e.q)===String(q)));   // gk has no column and counts in nothing (v1.2.3)
   const rows = roster.map(p => {
     const mine = ev.filter(e => String(e.cap)===String(p.cap));
     const cnt = k => mine.filter(e => e.action===k).length;
@@ -493,6 +510,26 @@ function exclusionsByCap(events, team){
   for (const e of events) if (e.team===team && e.action==='exl') m[e.cap]=(m[e.cap]||0)+1;
   return m;
 }
+// Personal fouls (exclusions + penalties) per PLAYER - three of any mix and the player is out for the game
+// (USAWP rules WP 25.1-25.2; NFHS 1-24 Art. 4: fouls follow the player when a field player and goalkeeper swap caps).
+// A player is keyed by roster name, so caps 10 and 1A carrying the same name add up; a cap with no name counts alone.
+// Returns {byCap: cap -> tally (every roster cap of a fouled player points at the same tally), players: [tally]}; tally = {e, p, n, caps}.
+function personalFouls(events, team, roster){
+  const nameOf = {}; for (const r of (roster||[])) { const nm = String(r.name||'').trim().toLowerCase(); if (nm) nameOf[String(r.cap)] = nm; }
+  const key = c => nameOf[String(c)] ? 'n:'+nameOf[String(c)] : 'c:'+String(c);
+  const by = {}, byCap = {};
+  for (const e of events) {
+    if (e.team!==team || (e.action!=='exl' && e.action!=='pen')) continue;
+    const k = key(e.cap), t = by[k] || (by[k] = {e:0, p:0, n:0, caps:[]});
+    if (e.action==='exl') t.e++; else t.p++; t.n++;
+    if (!t.caps.includes(String(e.cap))) t.caps.push(String(e.cap));
+    byCap[String(e.cap)] = t;
+  }
+  for (const r of (roster||[])) { const t = by[key(r.cap)]; if (t) byCap[String(r.cap)] = t; }
+  return {byCap, players: Object.values(by)};
+}
+// Short label for a foul tally: E2, P, E1 P, E2 P2.
+const foulTxt=f=>(f.e?'E'+f.e:'')+(f.p?(f.e?' ':'')+'P'+(f.p>1?f.p:''):'');
 function goalsByCap(events, team){
   const m = {};
   for (const e of events) if (e.team===team && isGoal(e)) m[e.cap]=(m[e.cap]||0)+1;
@@ -579,17 +616,69 @@ function applyEdit(e, changes){
   for(const f of diff) e[f]=changes[f];
   e.edited=true; return true;
 }
+// ---- v1.2.3: the goalie timeline (WP-88 d) and deletions in the export (WP-88 b) ----
+// Events in time order: by ts, then by their order in events[] (ties - an inserted event, the guard's gk at save-1 s - keep array order).
+function inTimeOrder(events){ return events.map((e,i)=>({e,i,t:Date.parse(e.ts)||0})).sort((a,b)=>(a.t-b.t)||(a.i-b.i)).map(x=>x.e); }
+// The cap in goal at `ts` = the cap of the latest `gk` event at or before ts (by ts, then by order). null before the first gk.
+function goalieAt(events, ts){
+  const T = typeof ts==='number' ? ts : (Date.parse(ts)||0); let best=null, bt=-Infinity;
+  for (const e of events){ if(e.team!=='us' || e.action!=='gk') continue; const t=Date.parse(e.ts)||0; if(t<=T && t>=bt){ best=e; bt=t; } }
+  return best ? String(best.cap) : null;
+}
+// Goalie by quarter = the goalie at the quarter's first event (derived from the gk timeline, never a second field).
+// {q: cap|null} for every quarter that has an event; `changed` lists quarters with a gk after their first event.
+function goalieByQuarter(events){
+  const out={}, changed=[]; const ordered=inTimeOrder(events);
+  for (const q of QUARTERS){ const inQ=ordered.filter(e=>String(e.q)===q); if(!inQ.length) continue;
+    const t0=Date.parse(inQ[0].ts)||0; out[q]=goalieAt(events, t0);
+    if(inQ.some(e=>e.team==='us'&&e.action==='gk'&&(Date.parse(e.ts)||0)>t0)) changed.push(q); }
+  return {byQuarter:out, changed};
+}
+// Every delete moves the rows out of events[] into deleted[] with a deletedAt stamp - nothing is dropped on the floor.
+// `ids` already includes the paired follow-ups the caller wants to go with the primary. Returns the moved rows.
+function deleteEvents(G, ids, now){
+  const set=new Set(ids), stamp=now||new Date().toISOString(), moved=[];
+  if(!Array.isArray(G.deleted)) G.deleted=[];
+  G.events=G.events.filter(e=>{ if(!set.has(e.id)) return true; moved.push(Object.assign({}, e, {deletedAt:stamp})); return false; });
+  G.deleted.push(...moved); return moved;
+}
+// Restore one deleted row: back into events[] at its ts position, deletedAt removed, marked edited. Returns the event or null.
+function restoreDeleted(G, id){
+  const list=Array.isArray(G.deleted)?G.deleted:[]; const i=list.findIndex(d=>d.id===id); if(i<0) return null;
+  const e=Object.assign({}, list[i]); delete e.deletedAt; e.edited=true; list.splice(i,1);
+  const t=Date.parse(e.ts)||0; let at=G.events.length;
+  for(let k=0;k<G.events.length;k++){ if((Date.parse(G.events[k].ts)||0)>t){ at=k; break; } }
+  G.events.splice(at,0,e); return e;
+}
+// ---- v1.2.3: the export contract's value shapes (wp-app export_shape.py, brief 27 A; 27a §7 Q-2, ruled by Jeff 2026-10-09) ----
+// The server refuses a cap, a short name or a location it would not expect; the tracker holds the same line on the phone so a
+// scorer finds out at Start game, not at Sync. Caps: 1, 1A-1Z, 2-99. usShort ≤ 10, loc ≤ 20 characters.
+const CAP_RE = /^(1[A-Z]?|[2-9]|[1-9][0-9])$/;
+const USSHORT_MAX = 10, LOC_MAX = 20;
+function normCap(c){ return String(c==null?'':c).trim().toUpperCase(); }
+// Every reason the export would be refused, in the order a scorer can fix them on the Setup tab. [] when clean.
+function exportProblems(g){
+  const out=[];
+  if((g.usShort||'').length>USSHORT_MAX) out.push(`Short name is ${g.usShort.length} characters (max ${USSHORT_MAX})`);
+  if((g.loc||'').length>LOC_MAX) out.push(`Location is ${g.loc.length} characters (max ${LOC_MAX})`);
+  for(const [side,list] of [['Our',g.rosterUs||[]],['Opponent',g.rosterOpp||[]]]) for(const p of list){ const c=String(p.cap==null?'':p.cap); if(c!=='' && !CAP_RE.test(c)) out.push(`${side} cap "${c}" - use 1, 1A-1Z or 2-99`); }
+  for(const e of (g.events||[])){ const c=String(e.cap==null?'':e.cap); if(!CAP_RE.test(c)) out.push(`Event cap "${c}" (${e.team} ${e.action}) - use 1, 1A-1Z or 2-99`); }
+  return out;
+}
 // ===END LOGIC===
 
-if (typeof module!=='undefined') module.exports = {APP_VERSION,ACTION_DEFS,FOLLOWUPS,ALLOWED_FOLLOWUP,defaultLayout,normalizeLayout,sideButtons,labelFor,isGoalieCap,computeStats,totals,scoreByQuarter,scorersByQuarter,exclusionsByCap,goalsByCap,pairedOf,pairSuffix,specialTeams,consistencyChecks,toMarkdown,toCSV,applyEdit,QUARTERS,needsConfirm,recentSameTeamGoal,CONFIRM_ALT,OPP_ORDER_V1,OPP_ORDER_V2,LAYOUT_V,DUP_GOAL_MS};
+if (typeof module!=='undefined') module.exports = {APP_VERSION,ACTION_DEFS,FOLLOWUPS,ALLOWED_FOLLOWUP,defaultLayout,normalizeLayout,sideButtons,labelFor,isGoalieCap,computeStats,totals,scoreByQuarter,scorersByQuarter,exclusionsByCap,personalFouls,foulTxt,goalsByCap,pairedOf,pairSuffix,specialTeams,consistencyChecks,toMarkdown,toCSV,applyEdit,QUARTERS,needsConfirm,recentSameTeamGoal,CONFIRM_ALT,OPP_ORDER_V1,OPP_ORDER_V2,LAYOUT_V,DUP_GOAL_MS,GK_DEF,inTimeOrder,goalieAt,goalieByQuarter,deleteEvents,restoreDeleted,CAP_RE,USSHORT_MAX,LOC_MAX,normCap,exportProblems};
 if (typeof document!=='undefined') (function(){
 // ===UI===
 // Caps only — no names in the public file. Import roster-*.json (kept private) to load names once; they persist on-device.
 const DEFAULT_ROSTER = ['1','1A','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','21'].map(c=>({cap:c,name:''}));
-const KEY='wpst_v1', LKEY='wpst_layout_v1';
+const KEY='wpst_v1', LKEY='wpst_layout_v1', SKEY='wpst_sync';
 let store = {games:{}, current:null, roster:null, usShort:''};
 let L = defaultLayout();
-let G = null;              // current game {id,date,us,usShort,opp,loc,ha,lvl,caps,rosterUs,rosterOpp,events,q,locked,sprintAsked}
+// v1.2.3 Settings + Sync (WP-118 h): the server and the device token live ONLY here - never in store, L or G, so never in an export,
+// a backup, the CSV, the Markdown or the share sheet. `fixtures` remembers the fixture picked per game id (on the device, not in the export).
+let S = {server:'', token:'', fixtures:{}};
+let G = null;              // current game {id,date,us,usShort,opp,loc,ha,lvl,caps,rosterUs,rosterOpp,events,deleted,q,locked,sprintAsked}
 let selected = null;       // {team,cap}
 let lastTap = 0;
 let flash = null, flashT = null;   // {id} of the event shown in the confirmation banner
@@ -598,23 +687,28 @@ const FLASH_MS = 6000;
 function safeLoad(){ try{ const s=localStorage.getItem(KEY); if(s) store=JSON.parse(s); }catch(e){} try{ const l=localStorage.getItem(LKEY); L=normalizeLayout(l?JSON.parse(l):null); if(l) saveLayout(); }catch(e){ L=defaultLayout(); } }
 function save(){ try{ if(G){ store.games[G.id]=G; store.current=G.id; store.roster=G.rosterUs; store.usShort=G.usShort||''; store.us=G.us; } localStorage.setItem(KEY, JSON.stringify(store)); el('saveState').textContent='saved '+new Date().toLocaleTimeString(); }catch(e){ el('saveState').textContent='⚠ not saved (storage unavailable) — use Backup .json'; } }
 function saveLayout(){ try{ localStorage.setItem(LKEY, JSON.stringify(L)); }catch(e){} }
+function normalizeSync(raw){ const s={server:'', token:'', fixtures:{}}; if(raw&&typeof raw==='object'){ s.server=String(raw.server||'').trim(); s.token=String(raw.token||''); if(raw.fixtures&&typeof raw.fixtures==='object') s.fixtures=raw.fixtures; } return s; }
+function loadSync(){ try{ const s=localStorage.getItem(SKEY); S=normalizeSync(s?JSON.parse(s):null); }catch(e){ S=normalizeSync(null); } }
+function saveSync(){ try{ localStorage.setItem(SKEY, JSON.stringify(S)); }catch(e){} }
+function syncBase(){ const s=(S.server||'').trim().replace(/\/+$/,''); return s || location.origin; }   // blank = the page's own origin (ruling c)
 function el(id){ return document.getElementById(id); }
 function today(){ const d=new Date(); return d.toISOString().slice(0,10); }
-function migrate(g){ if(!g.q) g.q='1'; if(!g.locked) g.locked={}; if(!g.sprintAsked) g.sprintAsked={}; if(!g.caps) g.caps=L.defaultCaps; if(g.usShort===undefined) g.usShort=store.usShort||''; return g; }
+function migrate(g){ if(!g.q) g.q='1'; if(!g.locked) g.locked={}; if(!g.sprintAsked) g.sprintAsked={}; if(!g.caps) g.caps=L.defaultCaps; if(g.usShort===undefined) g.usShort=store.usShort||''; if(!Array.isArray(g.deleted)) g.deleted=[]; return g; }
 function blankGame(){ return migrate({id:'g'+Date.now(), date:today(), us:store.us||'St. Xavier', usShort:store.usShort||'', opp:'', loc:'', ha:'Home', lvl:'Varsity', caps:L.defaultCaps,
   rosterUs: (store.roster && store.roster.length) ? JSON.parse(JSON.stringify(store.roster)) : JSON.parse(JSON.stringify(DEFAULT_ROSTER)),
-  rosterOpp: Array.from({length:30},(_,i)=>({cap:String(i+1),name:''})), events:[], q:'1'}); }
+  rosterOpp: Array.from({length:30},(_,i)=>({cap:String(i+1),name:''})), events:[], deleted:[], q:'1'}); }
+const currentGk = () => goalieAt(G.events, Date.now());
 const usName = () => G.usShort || G.us || 'US';
 const oppName = () => G.opp || 'OPP';
 
 // ---- setup ----
 function bindHeader(){ el('gDate').value=G.date||today(); el('gUs').value=G.us||''; el('gUsShort').value=G.usShort||''; el('gOpp').value=G.opp||''; el('gLoc').value=G.loc||''; el('gHA').value=G.ha||'Home'; el('gLvl').value=G.lvl||'Varsity'; el('gCaps').value=G.caps||'dark'; }
-['gDate','gUs','gUsShort','gOpp','gLoc','gHA','gLvl','gCaps'].forEach(id=>{ document.addEventListener('DOMContentLoaded',()=>{ el(id).addEventListener('change',()=>{ G.date=el('gDate').value; G.us=el('gUs').value; G.usShort=el('gUsShort').value.trim(); G.opp=el('gOpp').value; G.loc=el('gLoc').value; G.ha=el('gHA').value; G.lvl=el('gLvl').value; G.caps=el('gCaps').value; save(); renderSavedList(); }); }); });
+['gDate','gUs','gUsShort','gOpp','gLoc','gHA','gLvl','gCaps'].forEach(id=>{ document.addEventListener('DOMContentLoaded',()=>{ el(id).addEventListener('change',()=>{ G.date=el('gDate').value; G.us=el('gUs').value; G.usShort=el('gUsShort').value.trim().slice(0,USSHORT_MAX); G.opp=el('gOpp').value; G.loc=el('gLoc').value.slice(0,LOC_MAX); G.ha=el('gHA').value; G.lvl=el('gLvl').value; G.caps=el('gCaps').value; save(); renderSavedList(); }); }); });
 function renderRoster(team){
   const list = team==='us'?G.rosterUs:G.rosterOpp; const box = el(team==='us'?'rosterUs':'rosterOpp'); box.innerHTML='';
   list.forEach((p,i)=>{ const d=document.createElement('div'); d.className='p';
     d.innerHTML=`<input class="cap" value="${p.cap}" placeholder="#"><input class="nm" value="${p.name||''}" placeholder="name"><button title="remove">✕</button>`;
-    const [c,n,b]=d.children; c.addEventListener('change',()=>{p.cap=c.value.trim(); save();}); n.addEventListener('change',()=>{p.name=n.value.trim(); save();});
+    const [c,n,b]=d.children; c.addEventListener('change',()=>{ p.cap=normCap(c.value); c.value=p.cap; if(p.cap && !CAP_RE.test(p.cap)) toast(`Cap "${p.cap}" - use 1, 1A-1Z or 2-99`); save(); }); n.addEventListener('change',()=>{p.name=n.value.trim(); save();});
     b.addEventListener('click',()=>{ list.splice(i,1); save(); renderRoster(team); }); box.appendChild(d); });
 }
 window.addPlayer = t => { (t==='us'?G.rosterUs:G.rosterOpp).push({cap:'',name:''}); renderRoster(t); };
@@ -626,7 +720,7 @@ window.sortRoster = t => { (t==='us'?G.rosterUs:G.rosterOpp).sort((a,b)=>capSort
 window.newGame = () => { if(G && G.events.length && !confirm('Start a new game? Current game stays saved in the list.')) return; store.roster=G?G.rosterUs:store.roster; G=blankGame(); save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); toast('New game'); };
 window.loadSaved = id => { if(!id) return; G=migrate(store.games[id]); store.current=id; save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderAll(); toast('Loaded'); };
 function renderSavedList(){ const s=el('savedGames'); s.innerHTML='<option value="">— load —</option>'; Object.values(store.games).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).forEach(g=>{ const o=document.createElement('option'); o.value=g.id; o.textContent=`${g.date} ${g.us||''} vs ${g.opp||'?'} (${g.events.length} ev)`; if(G&&g.id===G.id) o.selected=true; s.appendChild(o); }); }
-window.startGame = () => { G.rosterUs=G.rosterUs.filter(p=>p.cap!==''); G.rosterOpp=G.rosterOpp.filter(p=>p.cap!==''); save(); show('game'); wake(); maybeSprint(G.q); };
+window.startGame = () => { G.rosterUs=G.rosterUs.filter(p=>p.cap!==''); G.rosterOpp=G.rosterOpp.filter(p=>p.cap!==''); save(); const bad=exportProblems(G); if(bad.length){ toast(bad[0]+(bad.length>1?` (+${bad.length-1} more)`:'')); return; } show('game'); wake(); maybeSprint(G.q); };
 
 // ---- game ----
 function show(v){ document.querySelectorAll('.tabs button[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id===v)); if(v==='stats') renderStats(); if(v==='log') renderLog(); if(v==='export') renderExport(); if(v==='game') renderGame(); if(v==='settings') renderSettings(); }
@@ -640,20 +734,19 @@ function renderGame(){
   el('colUs').classList.toggle('hide',phoneTeam!=='us'); el('colOpp').classList.toggle('hide',phoneTeam!=='opp');
   el('game').classList.toggle('oppmode',phoneTeam==='opp'); el('oppBarTxt').textContent='Logging for '+oppName().toUpperCase(); el('oppBack').textContent='← '+usName().toUpperCase();
   document.querySelectorAll('.qbar button[data-q]').forEach(b=>{ b.classList.toggle('on',b.dataset.q===String(G.q)); b.classList.toggle('lock',!!G.locked[b.dataset.q]); });
-  const exUs=exclusionsByCap(G.events,'us'), exOpp=exclusionsByCap(G.events,'opp'); const glUs=goalsByCap(G.events,'us'), glOpp=goalsByCap(G.events,'opp');
+  const exUs=personalFouls(G.events,'us',G.rosterUs).byCap, exOpp=personalFouls(G.events,'opp',G.rosterOpp).byCap; const glUs=goalsByCap(G.events,'us'), glOpp=goalsByCap(G.events,'opp');
   const mk=(team,list,ex,gl)=>{ const box=el(team==='us'?'capsUs':'capsOpp'); box.innerHTML='';
     list.forEach(p=>{ const b=document.createElement('button'); b.className='cap '+team+(selected&&selected.team===team&&selected.cap===p.cap?' sel':'');
-      const n=ex[p.cap]||0, g=gl[p.cap]||0; b.innerHTML=`${p.cap}${p.name?`<small>${p.name}</small>`:''}${n?`<span class="exl${n>=3?' out':''}">${n>=3?'OUT':'E'+n}</span>`:''}${(L.showGoalBadge&&g)?`<span class="gl">${g}</span>`:''}`;
+      const f=ex[p.cap], n=f?f.n:0, g=gl[p.cap]||0; b.innerHTML=`${p.cap}${p.name?`<small>${p.name}</small>`:''}${n?`<span class="exl${n>=3?' out':''}">${n>=3?'OUT':foulTxt(f)}</span>`:''}${(L.showGoalBadge&&g)?`<span class="gl">${g}</span>`:''}`;
       b.addEventListener('click',()=>selectCap(team,p.cap)); box.appendChild(b); }); };
   mk('us',G.rosterUs,exUs,glUs); mk('opp',G.rosterOpp,exOpp,glOpp);
   renderActions(); renderQScore(); renderFouls(); renderScore(); renderLast3();
 }
-// Running fouls strip: every cap with an exclusion or penalty, both teams, OUT flagged. What you check the table against.
+// Running fouls strip: every player with an exclusion or penalty, both teams; 3 personal fouls (any mix) = OUT. What you check the table against.
 function renderFouls(){
-  const side=(team,name)=>{ const ex=exclusionsByCap(G.events,team); const pen={}; for(const e of G.events) if(e.team===team&&e.action==='pen') pen[e.cap]=(pen[e.cap]||0)+1;
-    const caps=[...new Set([...Object.keys(ex),...Object.keys(pen)])].sort(capSort);
-    const tot=Object.values(ex).reduce((a,b)=>a+b,0);
-    const items=caps.map(c=>{ const n=ex[c]||0, p=pen[c]||0; const cls=n>=3?'out':(n===2?'e2':''); return `<span class="c ${cls}">#${c}${n?' '+(n>=3?'OUT':'E'+n):''}${p?` <span class="p">P${p>1?p:''}</span>`:''}</span>`; }).join('');
+  const side=(team,name)=>{ const pf=personalFouls(G.events,team,team==='us'?G.rosterUs:G.rosterOpp);
+    const tot=pf.players.reduce((a,f)=>a+f.e,0);
+    const items=pf.players.slice().sort((a,b)=>capSort(a.caps[0],b.caps[0])).map(f=>{ const cls=f.n>=3?'out':(f.n===2?'e2':''); return `<span class="c ${cls}">#${f.caps.join('/')}${f.n>=3?' OUT':''} <span class="p">${foulTxt(f)}</span></span>`; }).join('');
     return `<div class="${team}"><b class="t">${name} · ${tot} EXL</b>${items||'<span class="none">none</span>'}</div>`; };
   el('fouls').innerHTML=side('us',usName())+side('opp',oppName());
 }
@@ -666,7 +759,7 @@ function renderLast3(){
 }
 function selectCap(team,cap){ selected=(selected&&selected.team===team&&selected.cap===cap)?null:{team,cap}; renderGame(); }
 window.clearSel=()=>{ selected=null; renderGame(); };
-function actBtn(b, cap, onClick){ const x=document.createElement('button'); x.className='act'+(b.size==='2'?' w2':''); x.style.background=b.color; const def=ACTION_DEFS[b.key]; const lbl=(b.key==='block'&&isGoalieCap(cap))?'Save':b.label; x.innerHTML=lbl+(def.sub?`<small>${def.sub}</small>`:''); x.dataset.k=b.key; x.addEventListener('click',onClick); return x; }
+function actBtn(b, cap, onClick){ const x=document.createElement('button'); x.className='act'+(b.size==='2'?' w2':''); x.style.background=b.color; const def=ACTION_DEFS[b.key]||GK_DEF; const lbl=(b.key==='block'&&isGoalieCap(cap))?'Save':b.label; x.innerHTML=lbl+(def.sub?`<small>${def.sub}</small>`:''); x.dataset.k=b.key; x.addEventListener('click',onClick); return x; }
 function renderActions(){
   const box=el('actions'); box.innerHTML=''; const sb=el('selBox'); sb.className='sel';
   if(G.locked[G.q]){ sb.innerHTML=`<span class="small">${qName(G.q)} is locked. Tap ${qName(G.q)} above to review or unlock.</span>`; return; }
@@ -682,7 +775,7 @@ function renderFlash(sb){
   const other=e.team==='us'?'opp':'us'; const otherName=(other==='us'?usName():oppName()).toUpperCase();
   sb.className='sel flash '+e.team;
   sb.innerHTML=`<span class="fb"><span class="t">${(e.team==='us'?usName():oppName()).toUpperCase()}</span>#${e.cap} ${labelFor(L,e.team,e.action,e.cap)}<span class="small">${qName(e.q)}${isGoal(e)?' · '+score():''}</span></span><span class="fbtns"><button class="fbtn" id="fbUndo">Undo</button>${canSwap(e)?`<button class="fbtn" id="fbSwap">→ ${otherName}</button>`:''}</span>`;
-  el('fbUndo').addEventListener('click',()=>{ const ids=new Set([e.id,...pairedOf(G.events,e).map(p=>p.id)]); G.events=G.events.filter(x=>!ids.has(x.id)); flash=null; save(); toast(`Undid: #${e.cap} ${labelFor(L,e.team,e.action,e.cap)}`); renderGame(); });
+  el('fbUndo').addEventListener('click',()=>{ deleteEvents(G,[e.id,...pairedOf(G.events,e).map(p=>p.id)]); flash=null; save(); toast(`Undid: #${e.cap} ${labelFor(L,e.team,e.action,e.cap)}`); renderGame(); });
   const sw=el('fbSwap'); if(sw) sw.addEventListener('click',()=>openSwap(e));
   return true;
 }
@@ -710,6 +803,32 @@ function openDupGuard(team,cap,k,prev,opts){
   el('dgNo').addEventListener('click',()=>{ selected=null; setFlash(prev.id); closeSheet(); renderGame(); });
 }
 function newEvent(q,team,cap,action,extra){ return Object.assign({id:'e'+Date.now()+Math.random().toString(36).slice(2,6), q, team, cap, action, ts:new Date().toISOString()}, extra||{}); }
+// ---- v1.2.3 goalie timeline: one `gk` event per change; the chip, the Q1 prompt and the save guard all come here ----
+function logGk(cap, atMs, q){ const g=newEvent(q||G.q,'us',String(cap),'gk'); if(atMs) g.ts=new Date(atMs).toISOString(); G.events.push(g); save(); return g; }
+function gkTime(e){ return new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+// The GK sheet: the roster's goalie caps first (1, 1A-1C as the roster shows them), then "Other cap…" opens the full grid for a field player in goal.
+// `then` runs after a pick or a skip (the Q1 prompt chains the sprint prompt behind it).
+function openGk(opts){
+  opts=opts||{}; const cur=currentGk(); const goalies=G.rosterUs.filter(p=>isGoalieCap(p.cap)); let all=false;
+  const render=()=>{ const caps=all?G.rosterUs:goalies;
+    openSheet(`<h3>${opts.title||'Who is in goal?'} <span class="small">${cur?'now #'+cur:'no goalie set'} · ${qName(opts.q||G.q)}</span></h3>
+      <div class="sec">${all?'Every cap':'Goalie caps'}</div>${caps.length?capGridHtml('us',caps,cur||opts.defaultCap,'gk'):'<div class="small">no goalie cap on the roster — use Other cap…</div>'}
+      <div class="foot">${all?'':'<button id="gkOther">Other cap…</button>'}<button class="ghost" id="gkSkip">${opts.skipLabel||'Cancel'}</button></div>`);
+    el('sheet').querySelectorAll('.cap.gk').forEach(b=>b.addEventListener('click',()=>{ const cap=b.dataset.cap; closeSheet();
+      if(cur===String(cap)){ toast('Already in goal'); } else { logGk(cap, null, opts.q); toast(`#${cap} in goal`); }
+      renderGame(); if(opts.then) opts.then(); }));
+    const o=el('gkOther'); if(o) o.addEventListener('click',()=>{ all=true; render(); });
+    el('gkSkip').addEventListener('click',()=>{ closeSheet(); if(opts.then) opts.then(); }); };
+  render();
+}
+window.openGk=()=>openGk();
+function openGkGuard(team,cap,k,opts){
+  const cur=currentGk();
+  openSheet(`<h3>#${cap} in goal now? <span class="small">#${cur} is in goal · logging ${labelFor(L,team,k,cap)} on #${cap}</span></h3>
+    <div class="foot"><button class="primary" id="gkYes">Yes — #${cap} in goal, then the save</button><button class="sp" id="gkNo">No — the save only</button><button class="ghost" id="gkCancel">Cancel</button></div>`);
+  const go=withGk=>{ closeSheet(); if(withGk) logGk(cap, Date.now()-1000, G.q); logEvent(k,Object.assign({},opts,{gkOk:true,skipTap:true})); };
+  el('gkYes').addEventListener('click',()=>go(true)); el('gkNo').addEventListener('click',()=>go(false)); el('gkCancel').addEventListener('click',closeSheet);
+}
 function logEvent(k, opts){
   opts=opts||{};
   if(!opts.skipTap){ const now=Date.now(); if(now-lastTap<250) return; lastTap=now; }
@@ -718,6 +837,10 @@ function logEvent(k, opts){
   const team=selected.team, cap=selected.cap;
   if(L.guards && !opts.confirmed && needsConfirm(team,k)){ openConfirmRare(team,cap,k,opts); return; }
   if(L.guards && !opts.dupOk && (k==='goal'||k==='pgoal')){ const prev=recentSameTeamGoal(G.events,team,G.q,Date.now(),DUP_GOAL_MS); if(prev){ openDupGuard(team,cap,k,prev,opts); return; } }
+  // v1.2.3 guard on a save: a block on a goalie cap that is not the cap in goal asks once; with no gk yet, the first save sets it silently (he made a save; he was in).
+  if(k==='block' && team==='us' && isGoalieCap(cap) && !opts.gkOk){ const cur=currentGk();
+    if(cur===null){ logGk(cap, Date.now()-1000, G.q); toast(`GK set to #${cap}`); }
+    else if(cur!==String(cap)){ openGkGuard(team,cap,k,opts); return; } }
   const e=newEvent(G.q,team,cap,k);
   G.events.push(e); save();
   const b=L.buttons.find(x=>x.side===e.team&&x.key===k);
@@ -726,7 +849,7 @@ function logEvent(k, opts){
   renderGame();
   if(b&&b.followUp&&FOLLOWUPS[b.followUp]) openFollowUp(e,b.followUp);
 }
-window.undo=()=>{ const e=G.events.pop(); if(!e){toast('Nothing to undo');return;} flash=null; save(); toast(`Undid: #${e.cap} ${labelFor(L,e.team,e.action,e.cap)}`); renderGame(); };
+window.undo=()=>{ const e=G.events[G.events.length-1]; if(!e){toast('Nothing to undo');return;} deleteEvents(G,[e.id]); flash=null; save(); toast(`Undid: #${e.cap} ${labelFor(L,e.team,e.action,e.cap)}`); renderGame(); };
 document.addEventListener('click',e=>{ const b=e.target.closest('.qbar button[data-q]'); if(b) tapQuarter(b.dataset.q); });
 function tapQuarter(q){
   if(q===String(G.q)){ openBreak(q, null); return; }              // review current quarter mid-way
@@ -738,7 +861,10 @@ function tapQuarter(q){
 function gotoQuarter(q){ G.q=q; selected=null; save(); closeSheet(); renderGame(); maybeSprint(q); }
 function score(){ const s=scoreByQuarter(G.events); return `${s.total.us}–${s.total.opp}`; }
 function renderScore(){ const s=scoreByQuarter(G.events); el('scUs').textContent=s.total.us; el('scOpp').textContent=s.total.opp; }
-function renderQScore(){ const s=scoreByQuarter(G.events); el('qscore').innerHTML=QUARTERS.map(q=>`<div class="${String(G.q)===q?'on':''}">${qName(q)}<b>${s[q].us}–${s[q].opp}</b></div>`).join('')+`<div>Total<b>${s.total.us}–${s.total.opp}</b></div>`; }
+function renderQScore(){ const s=scoreByQuarter(G.events); const gk=currentGk();
+  el('qscore').innerHTML=QUARTERS.map(q=>`<div class="${String(G.q)===q?'on':''}">${qName(q)}<b>${s[q].us}–${s[q].opp}</b></div>`).join('')+`<div>Total<b>${s.total.us}–${s.total.opp}</b></div>`
+    +`<div class="chip gk" id="gkChip" title="Who is in goal">GK<b>${gk?'#'+gk:'?'}</b></div><div class="chip sync${S.token?'':' off'}" id="syncChip" title="Sync to the server">Sync<b>↑</b></div>`; }
+document.addEventListener('click',e=>{ if(e.target.closest('#gkChip')) openGk(); else if(e.target.closest('#syncChip')) syncNow(); });
 async function wake(){ try{ if('wakeLock' in navigator){ await navigator.wakeLock.request('screen'); } }catch(e){} }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') wake(); });
 
@@ -763,16 +889,19 @@ function openFollowUp(primary, kind){
 
 // Sprint prompt at quarter start (§1).
 function maybeSprint(q){
-  if(!L.sprintPrompt || q==='SO' || G.sprintAsked[q] || G.locked[q]) return;
+  if(q==='SO' || G.sprintAsked[q] || G.locked[q]) return;
   if(G.events.some(e=>String(e.q)===String(q))) return;
   G.sprintAsked[q]=true; save();
-  let cap=null;
-  const render=()=>{ openSheet(`<h3>${qName(q)} sprint <span class="small">who swam?</span></h3>${capGridHtml('us',G.rosterUs,cap,'sp')}
-    <div class="foot"><button class="primary" id="spW" ${cap?'':'disabled'}>Sprint W</button><button class="primary" id="spL" style="background:#3A4A6B" ${cap?'':'disabled'}>Sprint L</button><button class="ghost" id="spSkip">Skip</button></div>`);
-    el('sheet').querySelectorAll('.cap.sp').forEach(b=>b.addEventListener('click',()=>{ cap=b.dataset.cap; render(); }));
-    const log=k=>{ G.events.push(newEvent(q,'us',cap,k)); save(); closeSheet(); renderGame(); };
-    el('spW').addEventListener('click',()=>log('sprintw')); el('spL').addEventListener('click',()=>log('sprintl')); el('spSkip').addEventListener('click',closeSheet); };
-  render();
+  const sprint=()=>{ if(!L.sprintPrompt) return; let cap=null;
+    const render=()=>{ openSheet(`<h3>${qName(q)} sprint <span class="small">who swam?</span></h3>${capGridHtml('us',G.rosterUs,cap,'sp')}
+      <div class="foot"><button class="primary" id="spW" ${cap?'':'disabled'}>Sprint W</button><button class="primary" id="spL" style="background:#3A4A6B" ${cap?'':'disabled'}>Sprint L</button><button class="ghost" id="spSkip">Skip</button></div>`);
+      el('sheet').querySelectorAll('.cap.sp').forEach(b=>b.addEventListener('click',()=>{ cap=b.dataset.cap; render(); }));
+      const log=k=>{ G.events.push(newEvent(q,'us',cap,k)); save(); closeSheet(); renderGame(); };
+      el('spW').addEventListener('click',()=>log('sprintw')); el('spL').addEventListener('click',()=>log('sprintl')); el('spSkip').addEventListener('click',closeSheet); };
+    render(); };
+  // v1.2.3: Q1 asks who is in goal first (default = the roster's cap 1; Skip allowed), then the sprint. Q2-Q4 do not ask - the goalie carries over.
+  if(String(q)==='1' && currentGk()===null){ openGk({title:'In goal?', q:'1', skipLabel:'Skip', defaultCap:'1', then:sprint}); return; }
+  sprint();
 }
 
 // Edit sheet (§1): cap, action, quarter, team, delete, insert before/after.
@@ -782,7 +911,7 @@ function openEdit(id){
   let d={q:e.q, team:e.team, cap:e.cap, action:e.action};
   const render=()=>{
     const roster=d.team==='us'?G.rosterUs:G.rosterOpp; const btns=sideButtons(L,d.team,true).filter(b=>b.enabled||b.key===d.action);
-    if(!btns.some(b=>b.key===d.action)&&ACTION_DEFS[d.action]) btns.push({key:d.action,label:ACTION_DEFS[d.action].label,color:FAMILY_COLOR[ACTION_DEFS[d.action].family],size:'1'});
+    if(!btns.some(b=>b.key===d.action)&&(ACTION_DEFS[d.action]||d.action==='gk')){ const def=ACTION_DEFS[d.action]||GK_DEF; btns.push({key:d.action,label:def.label,color:FAMILY_COLOR[def.family],size:'1'}); }
     const paired=pairedOf(G.events,e); const primary=e.pair?G.events.find(x=>x.id===e.pair):null;
     openSheet(`<h3>Edit #${idx+1} <span class="small">${new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}${e.orig?` · was ${qName(e.orig.q)} ${e.orig.team==='us'?'US':'OPP'} #${e.orig.cap} ${e.orig.action}`:''}${primary?` · follow-up of #${G.events.indexOf(primary)+1}`:''}${paired.length?` · has ${paired.length} paired`:''}</span></h3>
       <div class="sec">Quarter</div><div class="qg">${QUARTERS.map(q=>`<button data-q="${q}" class="${q===String(d.q)?'on':''}${G.locked[q]?' lk':''}">${qName(q)}${G.locked[q]?' 🔒':''}</button>`).join('')}</div>
@@ -796,7 +925,7 @@ function openEdit(id){
     sh.querySelectorAll('.cap.ed').forEach(b=>b.addEventListener('click',()=>{ d.cap=b.dataset.cap; render(); }));
     const ag=el('edActs'); btns.forEach(b=>{ const x=actBtn(b,d.cap,()=>{ d.action=b.key; render(); }); if(b.key===d.action) x.classList.add('sel'); ag.appendChild(x); });
     el('edSave').addEventListener('click',()=>{ if(!d.cap){ toast('Pick a cap'); return; } applyEdit(e,d); save(); closeSheet(); renderAll(); });
-    el('edDel').addEventListener('click',()=>{ const msg=paired.length?`Delete this event and its ${paired.length} paired follow-up${paired.length>1?'s':''}?`:'Delete this event?'; if(!confirm(msg)) return; const ids=new Set([e.id,...paired.map(p=>p.id)]); G.events=G.events.filter(x=>!ids.has(x.id)); save(); closeSheet(); renderAll(); });
+    el('edDel').addEventListener('click',()=>{ const msg=paired.length?`Delete this event and its ${paired.length} paired follow-up${paired.length>1?'s':''}?`:'Delete this event?'; if(!confirm(msg)) return; deleteEvents(G,[e.id,...paired.map(p=>p.id)]); save(); closeSheet(); renderAll(); });
     const ins=(after)=>{ const n=newEvent(e.q,e.team,e.cap,e.action,{inserted:true}); n.ts=new Date(Date.parse(e.ts)+(after?1:-1)*1000).toISOString(); G.events.splice(idx+(after?1:0),0,n); save(); sheetAfter=null; openEdit(n.id); };
     el('edBefore').addEventListener('click',()=>ins(false)); el('edAfter').addEventListener('click',()=>ins(true));
     el('edCancel').addEventListener('click',closeSheet);
@@ -812,13 +941,17 @@ function openBreak(q, nextQ){
     const lines=team=>ev.filter(e=>e.team===team).map(e=>`<div class="ev${e.edited?' edited':''}" data-id="${e.id}"><b>#${e.cap}</b><span>${labelFor(L,e.team,e.action,e.cap)}</span><span class="m">${pairSuffix(G.events,e)}${e.pair?' ↳':''}</span><span class="ed">${e.edited?'edited':'edit'}</span></div>`).join('')||'<div class="small">none</div>';
     const per=team=>{ const rows=computeStats(ev,team==='us'?G.rosterUs:G.rosterOpp,team,q).filter(r=>r.goals||r.exl||r.pen); return rows.map(r=>`#${r.cap}${r.goals?' G'+r.goals:''}${r.exl?' E'+r.exl:''}${r.pen?' P'+r.pen:''}`).join(' · ')||'—'; };
     const ck=consistencyChecks(G.events,q).filter(c=>!c.ok); const st=specialTeams(G.events,q);
+    // v1.2.3: the goalie segments this quarter - the cap in goal at the quarter's first event, then each change, each tappable to edit
+    const ordered=inTimeOrder(ev); const t0=ordered.length?(Date.parse(ordered[0].ts)||0):0; const atStart=ordered.length?goalieAt(G.events, t0):null;
+    const gks=ordered.filter(e=>e.team==='us'&&e.action==='gk'&&(Date.parse(e.ts)||0)>t0);   // changes AFTER the quarter's first event (a gk that is the first event is the start, as goalieByQuarter reads it)
+    const gkLine=`<div class="gkline"><b class="t">GK</b>${atStart?'#'+atStart:'—'}${gks.map(g=>` → <span class="seg" data-id="${g.id}">#${g.cap} at ${gkTime(g)}</span>`).join('')}</div>`;
     openSheet(`<h3>${nextQ?`Close ${qName(q)}?`:`${qName(q)} review`} <span class="small">${usName()} ${s.us} – ${oppName()} ${s.opp}${locked?' · locked':''}</span></h3>
-      <div class="sum"><div class="us"><b class="t">${usName()}</b>${per('us')}</div><div class="opp"><b class="t">${oppName()}</b>${per('opp')}</div></div>
+      <div class="sum"><div class="us"><b class="t">${usName()}</b>${per('us')}</div><div class="opp"><b class="t">${oppName()}</b>${per('opp')}</div></div>${gkLine}
       <div class="chk">${ck.length?ck.map(c=>`<div class="no">✗ ${c.label}: ${c.a} vs ${c.b}</div>`).join(''):'<div class="ok">✓ drawn = called · assists ≤ goals · 5m consistent</div>'}<div class="small">Man-up ${st.manUp.conv}/${st.manUp.opps} · man-down killed ${st.manDown.killed}/${st.manDown.taken}</div></div>
       <div class="sec">${usName()} — ${ev.filter(e=>e.team==='us').length} events (tap to edit)</div><div class="lines">${lines('us')}</div>
       <div class="sec">${oppName()} — ${ev.filter(e=>e.team==='opp').length} events</div><div class="lines">${lines('opp')}</div>
       <div class="foot">${nextQ?`<button class="primary" id="brClose">Close ${qName(q)} → ${qName(nextQ)}</button>`:(locked?`<button class="primary" id="brUnlock">Unlock ${qName(q)}</button>`:`<button class="primary" id="brLock">Close &amp; lock ${qName(q)}</button>`)}<button class="ghost" id="brCancel">${nextQ?'Stay in '+qName(q):'Done'}</button></div>`);
-    el('sheet').querySelectorAll('.lines .ev').forEach(d=>d.addEventListener('click',()=>{ sheetAfter=()=>openBreak(q,nextQ); openEdit(d.dataset.id); }));
+    el('sheet').querySelectorAll('.lines .ev, .gkline .seg').forEach(d=>d.addEventListener('click',()=>{ sheetAfter=()=>openBreak(q,nextQ); openEdit(d.dataset.id); }));
     const lock=()=>{ G.locked[q]=true; save(); };
     if(el('brClose')) el('brClose').addEventListener('click',()=>{ lock(); gotoQuarter(nextQ); });
     if(el('brLock')) el('brLock').addEventListener('click',()=>{ lock(); closeSheet(); renderGame(); });
@@ -837,22 +970,24 @@ function renderStats(){
   h+=`<tr><td class="l"><b style="color:var(--usSel)">${usN}</b></td>${QUARTERS.map(q=>`<td>${s[q].us}</td>`).join('')}<td><b>${s.total.us}</b></td></tr>`;
   h+=`<tr><td class="l"><b style="color:var(--oppSel)">${opN}</b></td>${QUARTERS.map(q=>`<td>${s[q].opp}</td>`).join('')}<td><b>${s.total.opp}</b></td></tr></table>`;
   h+=`<div class="small" style="margin-top:8px">`; for(const q of QUARTERS){ const sc=scorersByQuarter(G.events,q); if(!sc.us.length&&!sc.opp.length) continue; h+=`<div><b>${qName(q)}:</b> ${usN} ${sc.us.join(', ')||'—'} &nbsp;·&nbsp; ${opN} ${sc.opp.join(', ')||'—'}</div>`; } h+=`</div>`;
-  const exUs=exclusionsByCap(G.events,'us'); const outs=Object.entries(exUs).filter(([c,n])=>n>=3).map(([c])=>'#'+c);
-  if(outs.length) h+=`<div class="flag" style="margin-top:6px">⚠ Fouled out (3 EXL): ${outs.join(', ')}</div>`;
+  const outs=team=>personalFouls(G.events,team,team==='us'?G.rosterUs:G.rosterOpp).players.filter(f=>f.n>=3).map(f=>'#'+f.caps.join('/')+' ('+foulTxt(f)+')');
+  const oU=outs('us'), oO=outs('opp');
+  if(oU.length||oO.length) h+=`<div class="flag" style="margin-top:6px">⚠ Fouled out (3 personal fouls, EXL + P): ${[oU.length?usN+' '+oU.join(', '):'',oO.length?opN+' '+oO.join(', '):''].filter(Boolean).join(' · ')}</div>`;
   el('reconcile').innerHTML=h;
   const ck=consistencyChecks(G.events,qf); const st=specialTeams(G.events,qf);
   el('checks').innerHTML=ck.map(c=>`<div class="${c.ok?'ok':'no'}">${c.ok?'✓':'✗'} ${c.label} — ${c.a} / ${c.b}</div>`).join('')+
     `<div>Man-up ${st.manUp.conv}/${st.manUp.opps} · Man-down killed ${st.manDown.killed}/${st.manDown.taken} · 5m: ${usN} ${st.pen.us.goals}/${st.pen.us.drawn} · ${opN} ${st.pen.opp.goals}/${st.pen.opp.drawn}</div><div class="small">Man-up = our goal within 25 s of their exclusion (app timestamps). The official timeline still rules.</div>`;
   el('statsUsHdr').textContent=usN+' — '+(qf==='all'?'game':qName(qf));
   el('statsOppHdr').textContent=opN+' — '+(qf==='all'?'game':qName(qf));
+  const pfU=personalFouls(G.events,'us',G.rosterUs).byCap, pfO=personalFouls(G.events,'opp',G.rosterOpp).byCap, fo=(m,c)=>(m[c]&&m[c].n>=3)?'flag':'';
   const rows=computeStats(G.events,G.rosterUs,'us',qf), t=totals(rows);
   let u=`<tr><th>#</th><th class="l">Athlete</th><th>G</th><th>Shots</th><th>Att</th><th>A</th><th>Blk</th><th>Stl</th><th>TO</th><th>EXL Drn</th><th>5m Drn</th><th>EXL</th><th>P</th><th>Sprint</th></tr>`;
-  for(const r of rows) u+=`<tr><td class="tap" data-team="us" data-cap="${r.cap}"><b>${r.cap}</b></td><td class="l">${r.name}</td><td>${r.goals||''}</td><td class="mono">${r.shots}</td><td>${r.att||''}</td><td>${r.assists||''}</td><td>${r.blocks||''}</td><td>${r.steals||''}</td><td>${r.to||''}</td><td>${r.exld||''}</td><td>${r.pend||''}</td><td class="${r.exl>=3?'flag':''}">${r.exl||''}</td><td>${r.pen||''}</td><td>${(r.sprintw||r.sprintl)?r.sprintw+'-'+r.sprintl:''}</td></tr>`;
+  for(const r of rows) u+=`<tr><td class="tap" data-team="us" data-cap="${r.cap}"><b>${r.cap}</b></td><td class="l">${r.name}</td><td>${r.goals||''}</td><td class="mono">${r.shots}</td><td>${r.att||''}</td><td>${r.assists||''}</td><td>${r.blocks||''}</td><td>${r.steals||''}</td><td>${r.to||''}</td><td>${r.exld||''}</td><td>${r.pend||''}</td><td class="${fo(pfU,r.cap)}">${r.exl||''}</td><td class="${fo(pfU,r.cap)}">${r.pen||''}</td><td>${(r.sprintw||r.sprintl)?r.sprintw+'-'+r.sprintl:''}</td></tr>`;
   u+=`<tr class="tot"><td></td><td class="l">Total</td><td>${t.goals}</td><td></td><td>${t.att}</td><td>${t.assists}</td><td>${t.blocks}</td><td>${t.steals}</td><td>${t.to}</td><td>${t.exld}</td><td>${t.pend}</td><td>${t.exl}</td><td>${t.pen}</td><td>${t.sprintw}-${t.sprintl}</td></tr>`;
   el('tblUs').innerHTML=u;
   const ro=computeStats(G.events,G.rosterOpp,'opp',qf).filter(r=>r.n>0), to=totals(ro);
   let o=`<tr><th>#</th><th>G</th><th>Shots</th><th>Att</th><th>EXL Drn</th><th>5m Drn</th><th>EXL</th><th>P</th><th>Stl</th><th>TO</th></tr>`;
-  for(const r of ro) o+=`<tr><td class="tap" data-team="opp" data-cap="${r.cap}"><b>${r.cap}</b></td><td>${r.goals||''}</td><td class="mono">${r.shots}</td><td>${r.att||''}</td><td>${r.exld||''}</td><td>${r.pend||''}</td><td class="${r.exl>=3?'flag':''}">${r.exl||''}</td><td>${r.pen||''}</td><td>${r.steals||''}</td><td>${r.to||''}</td></tr>`;
+  for(const r of ro) o+=`<tr><td class="tap" data-team="opp" data-cap="${r.cap}"><b>${r.cap}</b></td><td>${r.goals||''}</td><td class="mono">${r.shots}</td><td>${r.att||''}</td><td>${r.exld||''}</td><td>${r.pend||''}</td><td class="${fo(pfO,r.cap)}">${r.exl||''}</td><td class="${fo(pfO,r.cap)}">${r.pen||''}</td><td>${r.steals||''}</td><td>${r.to||''}</td></tr>`;
   o+=`<tr class="tot"><td>Total</td><td>${to.goals}</td><td></td><td>${to.att}</td><td>${to.exld}</td><td>${to.pend}</td><td>${to.exl}</td><td>${to.pen}</td><td>${to.steals}</td><td>${to.to}</td></tr>`;
   el('tblOpp').innerHTML=ro.length?o:'<tr><td class="small l">No opponent events yet.</td></tr>';
 }
@@ -868,17 +1003,26 @@ function openPlayer(team,cap){
 
 // ---- log ----
 function renderLog(){
-  const box=el('logList'); box.innerHTML=''; if(!G.events.length){ box.innerHTML='<div class="small">No events yet.</div>'; return; }
+  const box=el('logList'); box.innerHTML=''; if(!G.events.length && !(G.deleted||[]).length){ box.innerHTML='<div class="small">No events yet.</div>'; return; }
   [...G.events].reverse().forEach(e=>{ const d=document.createElement('div'); d.className='logrow'+(e.edited?' edited':'')+(G.locked[e.q]?' lock':'');
     d.innerHTML=`<span class="q">${qName(e.q)}</span><span class="t ${e.team}">${e.team==='us'?usName():oppName()}</span><b>#${e.cap}</b><span>${labelFor(L,e.team,e.action,e.cap)}</span><span class="pr">${pairSuffix(G.events,e)}${e.pair?' ↳':''}</span><span class="small">${new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span><span class="ed">${e.edited?'edited':(e.inserted?'inserted':'')}</span>`;
     d.addEventListener('click',()=>{ sheetAfter=renderLog; openEdit(e.id); });
     box.appendChild(d); });
+  // v1.2.3: what was deleted on this phone, read-only, collapsed; Restore puts a row back at its time (a wrong delete at the break is one tap)
+  const del=G.deleted||[]; if(!del.length) return;
+  const det=document.createElement('details'); det.id='deleted'; det.innerHTML=`<summary class="small">Deleted (${del.length}) — not in the stats; exported for the sync path</summary>`;
+  [...del].reverse().forEach(e=>{ const d=document.createElement('div'); d.className='logrow delrow';
+    d.innerHTML=`<span class="q">${qName(e.q)}</span><span class="t ${e.team}">${e.team==='us'?usName():oppName()}</span><b>#${e.cap}</b><span>${labelFor(L,e.team,e.action,e.cap)}</span><span class="small">${new Date(e.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span><button class="ghost restore" style="margin-left:auto">Restore</button>`;
+    d.querySelector('.restore').addEventListener('click',ev=>{ ev.stopPropagation(); restoreDeleted(G,e.id); save(); toast(`Restored #${e.cap} ${labelFor(L,e.team,e.action,e.cap)}`); renderAll(); });
+    det.appendChild(d); });
+  box.appendChild(det);
 }
 
 // ---- settings ----
 function renderSettings(){
   el('lyUsHdr').textContent=usName().toUpperCase(); el('lyOppHdr').textContent=oppName().toUpperCase(); el('verOut').textContent=APP_VERSION;
   el('optGoalBadge').checked=!!L.showGoalBadge; el('optSprint').checked=!!L.sprintPrompt; el('optCaps').value=L.defaultCaps; el('optOppReturn').checked=!!L.oppAutoReturn; el('optGuards').checked=!!L.guards;
+  el('syncServer').value=S.server||''; el('syncToken').value=S.token||''; renderSyncOrigin();
   const side=(s,boxId)=>{ const box=el(boxId); box.innerHTML=''; const list=sideButtons(L,s,true);
     list.forEach((b,i)=>b.order=i+1);   // normalise 1..n
     list.forEach((b,i)=>{ const d=document.createElement('div'); d.className='btnrow'+(b.enabled?'':' off');
@@ -902,13 +1046,59 @@ document.addEventListener('DOMContentLoaded',()=>{
   el('optOppReturn').addEventListener('change',ev=>{ L.oppAutoReturn=ev.target.checked; saveLayout(); });
   el('optGuards').addEventListener('change',ev=>{ L.guards=ev.target.checked; saveLayout(); });
   el('optCaps').addEventListener('change',ev=>{ L.defaultCaps=ev.target.value; saveLayout(); });
+  // v1.2.3 server settings: saved to wpst_sync only; the token field is a password field with show/hide
+  el('syncServer').addEventListener('change',ev=>{ S.server=ev.target.value.trim(); saveSync(); renderSyncOrigin(); });
+  el('syncToken').addEventListener('change',ev=>{ S.token=ev.target.value.trim(); saveSync(); renderSyncOrigin(); });
+  el('syncShow').addEventListener('click',()=>{ const t=el('syncToken'); const show=t.type==='password'; t.type=show?'text':'password'; el('syncShow').textContent=show?'hide':'show'; });
 });
+function renderSyncOrigin(){ let o='no server set'; if(S.token){ try{ o='server: '+new URL(syncBase()).origin; }catch(e){ o='server: (invalid URL)'; } } else if(S.server){ o='server set, no token'; } el('syncOrigin').textContent=o; }
 window.resetLayout=()=>{ if(!confirm('Reset all buttons to the default layout?')) return; L=defaultLayout(); saveLayout(); renderSettings(); toast('Layout reset'); };
 window.exportLayout=()=>{ const blob=new Blob([JSON.stringify(Object.assign({layoutVersion:LAYOUT_V, appVersion:APP_VERSION},L),null,1)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='wp-stat-tracker-layout.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500); };
 window.importLayout=inp=>{ const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const j=JSON.parse(r.result); if(!Array.isArray(j.buttons)) throw 0; L=normalizeLayout(j); saveLayout(); renderSettings(); toast('Layout imported'); }catch(e){ toast('Not a layout file'); } }; r.readAsText(f); inp.value=''; };
 
 // ---- export ----
-function renderExport(){ el('mdOut').value=toMarkdown(G,G.events,L); }
+function renderExport(){ el('mdOut').value=toMarkdown(G,G.events,L); const gk=G.events.filter(e=>e.action==='gk').length;
+  el('exInfo').textContent=`${G.events.length} events · deleted ${(G.deleted||[]).length} · gk ${gk} · sync ${S.token?'→ '+syncBase():'off (no token in Settings)'}`; }
+// ---- v1.2.3 Sync (WP-118 h): manual, synchronous, one post; the body is byte-equal to Download's JSON; nothing is read back (v1.3) ----
+const SYNC_MSG = {401:'Token refused - check Settings', 404:'No such fixture for this token'};
+function syncHeaders(json){ const h={'Authorization':'Bearer '+S.token}; if(json) h['Content-Type']='application/json'; return h; }
+function syncSheet(title, lines){ openSheet(`<h3>${title}</h3><div class="lines">${(lines||[]).map(l=>`<div class="ev"><span>${l}</span></div>`).join('')||'<div class="small">—</div>'}</div><div class="foot"><button class="primary" id="syClose">Close</button></div>`); el('syClose').addEventListener('click',closeSheet); }
+const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function syncFetch(url, opts){ const res=await fetch(url, opts); let body=null; try{ body=JSON.parse(await res.text()); }catch(e){} return {status:res.status, body}; }
+function notSent(reason){ return `Not sent - ${reason}; nothing changed on the server`; }
+function reasonOf(r){ const b=r.body||{}; const keys=Array.isArray(b.keys)?' ('+b.keys.join(', ')+')':''; return (b.error?String(b.error):('HTTP '+r.status))+keys; }   // the server names a path, never a value
+// The day's fixtures as a pick list; resolves to the fixture object or null (none, refused, or the scorer closed the sheet).
+async function pickFixture(base){
+  let r; try{ r=await syncFetch(`${base}/v0/fixtures?on=${encodeURIComponent(G.date||today())}`, {method:'GET', headers:syncHeaders(false)}); }
+  catch(e){ syncSheet('Sync', [notSent('no connection')]); return null; }
+  if(r.status!==200){ syncSheet('Sync', [SYNC_MSG[r.status]||notSent(reasonOf(r))]); return null; }
+  const list=(Array.isArray(r.body)?r.body:(r.body&&Array.isArray(r.body.fixtures)?r.body.fixtures:[])).filter(f=>f&&f.fixture_id!=null);
+  if(!list.length){ syncSheet('Sync', [`No fixture on ${esc(G.date)} for this token - staff add it in the admin`]); return null; }
+  return new Promise(resolve=>{ let pick=list.length===1?list[0]:null; let done=false; const finish=v=>{ if(done) return; done=true; sheetAfter=null; closeSheet(); resolve(v); };
+    const render=()=>{ openSheet(`<h3>Which fixture? <span class="small">${esc(G.date)} · ${list.length} on the server</span></h3><div class="lines">${list.map((f,i)=>`<div class="ev fx${pick===f?' edited':''}" data-i="${i}"><b>${esc(f.opponent_name||'?')}</b><span class="m">${esc(f.starts_at||f.starts_on||'')} · ${esc(f.level||'')} · ${esc(f.label||'')}</span></div>`).join('')}</div>
+        <div class="foot"><button class="primary" id="fxOk" ${pick?'':'disabled'}>Sync to this fixture</button><button class="ghost" id="fxCancel">Cancel</button></div>`);
+      el('sheet').querySelectorAll('.ev.fx').forEach(d=>d.addEventListener('click',()=>{ pick=list[Number(d.dataset.i)]; render(); }));
+      el('fxOk').addEventListener('click',()=>finish(pick)); el('fxCancel').addEventListener('click',()=>finish(null)); sheetAfter=()=>finish(null); };
+    render(); });
+}
+async function syncNow(){
+  if(!S.token){ toast('Set the device token in Settings'); return null; }
+  const bad=exportProblems(G); if(bad.length){ syncSheet('Not sent', bad.map(esc).concat(['Fix these on the Setup tab (or in the Log) and sync again; nothing was posted.'])); return null; }
+  const base=syncBase(); const body=JSON.stringify(exportObj(),null,1);   // the same bytes Download gives
+  let fx=S.fixtures[G.id];
+  if(!fx){ const f=await pickFixture(base); if(!f) return null; fx={fixture_id:f.fixture_id, opponent_name:f.opponent_name||'', starts_on:f.starts_on||f.starts_at||'', pickedAt:new Date().toISOString()}; S.fixtures[G.id]=fx; saveSync(); }
+  let r; try{ r=await syncFetch(`${base}/v0/sync/${encodeURIComponent(fx.fixture_id)}`, {method:'POST', headers:syncHeaders(true), body}); }
+  catch(e){ syncSheet('Sync', [notSent('no connection')]); return null; }
+  if(r.status===200){ const s=r.body||{}; const lines=Object.keys(s).filter(k=>typeof s[k]==='number'||typeof s[k]==='boolean').map(k=>`${esc(k)} ${esc(s[k])}`);
+    if(Array.isArray(s.ignored_keys)&&s.ignored_keys.length) lines.push('ignored_keys '+esc(s.ignored_keys.join(', ')));
+    if(Array.isArray(s.keys_dropped_names)&&s.keys_dropped_names.length) lines.push('keys_dropped_names '+esc(s.keys_dropped_names.join(', ')));
+    (Array.isArray(s.findings)?s.findings:[]).forEach(f=>lines.push('finding: '+esc(f)));
+    syncSheet(`Synced <span class="small">${esc(fx.opponent_name||'')} · ${esc(fx.starts_on||'')}</span>`, lines); toast('Synced'); return s; }
+  if(r.status===404){ delete S.fixtures[G.id]; saveSync(); }
+  syncSheet('Sync', [r.status===400 ? esc(reasonOf(r)) : (SYNC_MSG[r.status] || notSent(esc(reasonOf(r))))]);
+  return null;
+}
+window.syncNow=syncNow;
 window.copyMD=async()=>{ const t=el('mdOut').value; try{ await navigator.clipboard.writeText(t); toast('Markdown copied'); }catch(e){ el('mdOut').select(); document.execCommand('copy'); toast('Copied (select-all fallback)'); } };
 function fname(ext){ return `${G.date||'game'}_${(G.us||'us').replace(/\W+/g,'')}_vs_${(G.opp||'opp').replace(/\W+/g,'')}.${ext}`; }
 function exportObj(){ return Object.assign({}, G, {appVersion:APP_VERSION, layout:L}); }
@@ -917,7 +1107,7 @@ window.dl=kind=>{ const a=document.createElement('a'); a.href=URL.createObjectUR
 window.shareFiles=async(kind)=>{ try{ const mime=kind==='json'?'application/json':'text/markdown'; const files=[new File([blobFor(kind)],fname(kind),{type:mime})];
   if(navigator.canShare&&navigator.canShare({files})) await navigator.share({files,title:fname(kind)}); else if(kind==='md') await navigator.share({title:fname('md'),text:toMarkdown(G,G.events,L)}); else throw 0; }catch(e){ if(e&&e.name==='AbortError') return; toast('Share not available — use Download'); } };
 window.restoreJSON=inp=>{ const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const g=JSON.parse(r.result);
-  if(Array.isArray(g.rosterUs) && !g.events){ G.rosterUs=g.rosterUs.map(p=>({cap:String(p.cap),name:p.name||''})); if(g.us) G.us=g.us; if(g.usShort) G.usShort=g.usShort; save(); bindHeader(); renderRoster('us'); toast('Roster imported'); return; }
+  if(Array.isArray(g.rosterUs) && !g.events){ G.rosterUs=g.rosterUs.map(p=>({cap:normCap(p.cap),name:p.name||''})); if(g.us) G.us=g.us; if(g.usShort) G.usShort=g.usShort; save(); bindHeader(); renderRoster('us'); toast('Roster imported'); return; }
   if(!g.events||!g.rosterUs) throw 0; g.id=g.id||('g'+Date.now()); delete g.appVersion; delete g.layout; G=migrate(g); save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); renderAll(); toast('Restored'); }catch(e){ toast('Not a valid backup or roster file'); } }; r.readAsText(f); inp.value=''; };
 window.wipe=()=>{ if(!confirm('Delete this game from this device?')) return; delete store.games[G.id]; const rest=Object.values(store.games); G=rest.length?migrate(rest[0]):blankGame(); save(); bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); renderAll(); show('setup'); };
 
@@ -927,13 +1117,13 @@ function renderAll(){ renderScore(); const v=document.querySelector('.view.on');
 // Offline: register the service worker so the app opens on a pool deck with no signal (v1.1.1, after Walnut Hills 2026-09-08).
 if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
 document.addEventListener('DOMContentLoaded',()=>{
-  safeLoad();
+  safeLoad(); loadSync();
   G = (store.current && store.games[store.current]) ? migrate(store.games[store.current]) : blankGame();
   save();
   bindHeader(); renderRoster('us'); renderRoster('opp'); renderSavedList(); renderScore();
 });
 // test hooks (no-ops in normal use)
-window.__wpst = { get G(){return G;}, set G(v){G=v;}, get L(){return L;}, save, renderAll, logEvent, tapQuarter, openEdit, selectCap:(t,c)=>selectCap(t,c), maybeSprint, resetTap:()=>{lastTap=0;}, get phoneTeam(){return phoneTeam;}, setPhoneTeam:t=>{phoneTeam=t; selected=null; renderGame();}, get flash(){return flash;} };
+window.__wpst = { get G(){return G;}, set G(v){G=v;}, get L(){return L;}, get S(){return S;}, save, renderAll, logEvent, tapQuarter, openEdit, selectCap:(t,c)=>selectCap(t,c), maybeSprint, resetTap:()=>{lastTap=0;}, get phoneTeam(){return phoneTeam;}, setPhoneTeam:t=>{phoneTeam=t; selected=null; renderGame();}, get flash(){return flash;}, openGk, syncNow, exportObj, blobFor, currentGk };
 })();
 </script>
 </body>
